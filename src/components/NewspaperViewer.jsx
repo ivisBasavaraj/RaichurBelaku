@@ -3,6 +3,8 @@ import { getClickableAreas } from '../utils/localStorage';
 
 const NewspaperViewer = ({ newspaper }) => {
   const [areas, setAreas] = useState([]);
+  const [selectedNews, setSelectedNews] = useState(null);
+  const [currentPage, setCurrentPage] = useState(0);
 
   useEffect(() => {
     if (newspaper) {
@@ -12,30 +14,32 @@ const NewspaperViewer = ({ newspaper }) => {
   }, [newspaper]);
 
   const handleAreaClick = (area) => {
-    // Create canvas to crop the image
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    const img = new Image();
-    
-    img.onload = () => {
-      canvas.width = Math.abs(area.width);
-      canvas.height = Math.abs(area.height);
-      
-      ctx.drawImage(
-        img,
-        area.x, area.y,
-        Math.abs(area.width), Math.abs(area.height),
-        0, 0,
-        Math.abs(area.width), Math.abs(area.height)
-      );
-      
-      // Open cropped image in new tab
-      const croppedDataUrl = canvas.toDataURL();
-      const newWindow = window.open();
-      newWindow.document.write(`<img src="${croppedDataUrl}" style="max-width:100%;height:auto;">`);
-    };
-    
-    img.src = newspaper.previewImage;
+    if (area.title || area.content) {
+      setSelectedNews(area);
+    }
+  };
+
+  const closeNewsModal = () => {
+    setSelectedNews(null);
+  };
+
+  const nextPage = () => {
+    if (newspaper.pages && currentPage < newspaper.totalPages - 1) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const prevPage = () => {
+    if (currentPage > 0) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const getCurrentPageImage = () => {
+    if (newspaper.pages && newspaper.pages[currentPage]) {
+      return newspaper.pages[currentPage].imageUrl;
+    }
+    return newspaper.previewImage;
   };
 
   if (!newspaper) {
@@ -61,15 +65,15 @@ const NewspaperViewer = ({ newspaper }) => {
       
       <div className="relative inline-block w-full">
         <img
-          src={newspaper.previewImage}
-          alt="Today's newspaper"
+          src={getCurrentPageImage()}
+          alt={`Newspaper page ${currentPage + 1}`}
           className="w-full h-auto border border-gray-300 rounded-lg shadow-sm"
         />
         
-        {areas.map(area => (
+        {areas.filter(area => area.pageNumber === currentPage + 1).map(area => (
           <div
             key={area.id}
-            className="absolute cursor-pointer hover:bg-blue-200 hover:bg-opacity-30 transition-colors"
+            className="absolute cursor-pointer hover:bg-blue-200 hover:bg-opacity-30 transition-colors border-2 border-transparent hover:border-blue-400"
             style={{
               left: area.x,
               top: area.y,
@@ -77,9 +81,76 @@ const NewspaperViewer = ({ newspaper }) => {
               height: Math.abs(area.height)
             }}
             onClick={() => handleAreaClick(area)}
+            title={area.title || 'ಸುದ್ದಿ ಓದಲು ಕ್ಲಿಕ್ ಮಾಡಿ'}
           />
         ))}
       </div>
+
+      {/* Page Navigation */}
+      {newspaper.pages && newspaper.totalPages > 1 && (
+        <div className="mt-4 flex justify-between items-center">
+          <button
+            onClick={prevPage}
+            disabled={currentPage === 0}
+            className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            ← ಹಿಂದಿನ ಪುಟ
+          </button>
+          
+          <div className="text-sm text-gray-600">
+            ಪುಟ {currentPage + 1} / {newspaper.totalPages}
+          </div>
+          
+          <button
+            onClick={nextPage}
+            disabled={currentPage === newspaper.totalPages - 1}
+            className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            ಮುಂದಿನ ಪುಟ →
+          </button>
+        </div>
+      )}
+
+      {/* News Modal */}
+      {selectedNews && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="text-xl font-bold text-newspaper-blue">{selectedNews.title}</h3>
+              <button
+                onClick={closeNewsModal}
+                className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+              >
+                ×
+              </button>
+            </div>
+            
+            {selectedNews.imageUrl && (
+              <div className="mb-4">
+                <img
+                  src={selectedNews.imageUrl}
+                  alt={selectedNews.title}
+                  className="w-full h-auto rounded-lg"
+                  onError={(e) => { e.target.style.display = 'none'; }}
+                />
+              </div>
+            )}
+            
+            <div className="text-gray-800 leading-relaxed whitespace-pre-wrap">
+              {selectedNews.content}
+            </div>
+            
+            <div className="mt-6 text-center">
+              <button
+                onClick={closeNewsModal}
+                className="bg-newspaper-blue text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                ಮುಚ್ಚಿಸಿ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

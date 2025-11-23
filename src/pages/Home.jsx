@@ -11,6 +11,11 @@ const Home = () => {
       <div className="bg-gradient-to-r from-newspaper-blue to-blue-600 text-white">
         <div className="max-w-7xl mx-auto px-4 py-16">
           <div className="text-center">
+            <img 
+              src="/logo.jpg" 
+              alt="ರಾಯಚೂರು ಬೆಳಕು Logo" 
+              className="w-20 h-20 md:w-24 md:h-24 rounded-full object-cover mx-auto mb-6"
+            />
             <h1 className="text-4xl md:text-6xl font-bold mb-4">ರಾಯಚೂರು ಬೆಳಕು</h1>
             <p className="text-xl md:text-2xl mb-2">Raichuru Belku</p>
             <p className="text-lg opacity-90 mb-8">ನಿಮ್ಮ ವಿಶ್ವಾಸಾರ್ಹ ಡಿಜಿಟಲ್ ಪತ್ರಿಕೆ</p>

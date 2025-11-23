@@ -1,12 +1,21 @@
-import React, { useState, useRef } from 'react';
-import { saveClickableAreas } from '../utils/localStorage';
+import React, { useState, useRef, useEffect } from 'react';
+import { saveClickableAreas, getClickableAreas } from '../utils/localStorage';
 
 const PDFMapper = ({ newspaper }) => {
   const [areas, setAreas] = useState([]);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentArea, setCurrentArea] = useState(null);
   const [currentPage, setCurrentPage] = useState(0);
+  const [selectedArea, setSelectedArea] = useState(null);
+  const [showContentForm, setShowContentForm] = useState(false);
   const imageRef = useRef(null);
+
+  useEffect(() => {
+    if (newspaper) {
+      const savedAreas = getClickableAreas(newspaper.id);
+      setAreas(savedAreas);
+    }
+  }, [newspaper]);
 
   const handleMouseDown = (e) => {
     const rect = imageRef.current.getBoundingClientRect();
@@ -37,9 +46,15 @@ const PDFMapper = ({ newspaper }) => {
     if (Math.abs(currentArea.width) > 20 && Math.abs(currentArea.height) > 20) {
       const newArea = {
         id: Date.now().toString(),
-        ...currentArea
+        ...currentArea,
+        title: '',
+        content: '',
+        imageUrl: '',
+        pageNumber: currentPage + 1
       };
       setAreas(prev => [...prev, newArea]);
+      setSelectedArea(newArea);
+      setShowContentForm(true);
     }
     setCurrentArea(null);
     setIsDrawing(false);
@@ -48,6 +63,31 @@ const PDFMapper = ({ newspaper }) => {
   const deleteArea = (areaId) => {
     const updatedAreas = areas.filter(area => area.id !== areaId);
     setAreas(updatedAreas);
+    if (selectedArea && selectedArea.id === areaId) {
+      setSelectedArea(null);
+      setShowContentForm(false);
+    }
+  };
+
+  const handleAreaClick = (area) => {
+    setSelectedArea(area);
+    setShowContentForm(true);
+  };
+
+  const handleContentSave = (contentData) => {
+    const updatedAreas = areas.map(area => 
+      area.id === selectedArea.id 
+        ? { ...area, ...contentData }
+        : area
+    );
+    setAreas(updatedAreas);
+    setShowContentForm(false);
+    setSelectedArea(null);
+  };
+
+  const handleContentCancel = () => {
+    setShowContentForm(false);
+    setSelectedArea(null);
   };
 
   const handleSaveAll = () => {
@@ -71,23 +111,34 @@ const PDFMapper = ({ newspaper }) => {
           draggable={false}
         />
         
-        {areas.map(area => (
+        {areas.filter(area => area.pageNumber === currentPage + 1).map(area => (
           <div
             key={area.id}
-            className="clickable-area group"
+            className={`clickable-area group cursor-pointer ${
+              selectedArea && selectedArea.id === area.id ? 'ring-2 ring-blue-500' : ''
+            }`}
             style={{
               left: area.x,
               top: area.y,
               width: Math.abs(area.width),
               height: Math.abs(area.height)
             }}
+            onClick={() => handleAreaClick(area)}
           >
             <button
-              onClick={() => deleteArea(area.id)}
-              className="absolute -top-2 -right-2 bg-newspaper-red text-white rounded-full w-6 h-6 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={(e) => {
+                e.stopPropagation();
+                deleteArea(area.id);
+              }}
+              className="absolute -top-2 -right-2 bg-newspaper-red text-white rounded-full w-6 h-6 text-xs opacity-0 group-hover:opacity-100 transition-opacity z-10"
             >
               ×
             </button>
+            {area.title && (
+              <div className="absolute -bottom-6 left-0 bg-black bg-opacity-75 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity max-w-40 truncate">
+                {area.title}
+              </div>
+            )}
           </div>
         ))}
         
@@ -141,10 +192,98 @@ const PDFMapper = ({ newspaper }) => {
         )}
         <div className="text-xs sm:text-sm text-gray-600 space-y-1">
           <p>• ಮೌಸ್ ಡ್ರ್ಯಾಗ್ ಮಾಡಿ ಪ್ರದೇಶವನ್ನು ಆಯ್ಕೆ ಮಾಡಿ</p>
+          <p>• ಪ್ರದೇಶವನ್ನು ಕ್ಲಿಕ್ ಮಾಡಿ ವಿಷಯ ಸೇರಿಸಿ</p>
           <p>• ಅಸ್ತಿತ್ವದಲ್ಲಿರುವ ಪ್ರದೇಶಗಳನ್ನು ಅಳಿಸಲು × ಬಟನ್ ಕ್ಲಿಕ್ ಮಾಡಿ</p>
         </div>
       </div>
+
+      {/* Content Form Modal */}
+      {showContentForm && selectedArea && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold text-newspaper-blue mb-4">ಸುದ್ದಿ ವಿಷಯ ಸೇರಿಸಿ</h3>
+            <ContentForm
+              area={selectedArea}
+              onSave={handleContentSave}
+              onCancel={handleContentCancel}
+            />
+          </div>
+        </div>
+      )}
     </div>
+  );
+};
+
+// Content Form Component
+const ContentForm = ({ area, onSave, onCancel }) => {
+  const [title, setTitle] = useState(area.title || '');
+  const [content, setContent] = useState(area.content || '');
+  const [imageUrl, setImageUrl] = useState(area.imageUrl || '');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSave({ title, content, imageUrl });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          ಸುದ್ದಿ ಶೀರ್ಷಿಕೆ
+        </label>
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-newspaper-blue"
+          placeholder="ಸುದ್ದಿ ಶೀರ್ಷಿಕೆ ನಮೂದಿಸಿ..."
+          required
+        />
+      </div>
+      
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          ಸುದ್ದಿ ವಿಷಯ
+        </label>
+        <textarea
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          rows={4}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-newspaper-blue"
+          placeholder="ಸುದ್ದಿ ವಿಷಯ ನಮೂದಿಸಿ..."
+          required
+        />
+      </div>
+      
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          ಚಿತ್ರ URL (ಐಚ್ಛಿಕ)
+        </label>
+        <input
+          type="url"
+          value={imageUrl}
+          onChange={(e) => setImageUrl(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-newspaper-blue"
+          placeholder="https://example.com/image.jpg"
+        />
+      </div>
+      
+      <div className="flex space-x-3 pt-4">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="flex-1 bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600 transition-colors"
+        >
+          ರದ್ದುಮಾಡಿ
+        </button>
+        <button
+          type="submit"
+          className="flex-1 bg-newspaper-blue text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
+        >
+          ಉಳಿಸಿ
+        </button>
+      </div>
+    </form>
   );
 };
 

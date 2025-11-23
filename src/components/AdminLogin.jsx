@@ -21,9 +21,11 @@ const AdminLogin = ({ onLogin }) => {
       <div className="max-w-md w-full">
         <div className="bg-white rounded-lg shadow-md p-6 sm:p-8">
           <div className="text-center mb-6 sm:mb-8">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-newspaper-red rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-              <span className="text-white font-bold text-xl sm:text-2xl">ರ</span>
-            </div>
+            <img 
+              src="/logo.jpg" 
+              alt="ರಾಯಚೂರು ಬೆಳಕು Logo" 
+              className="w-12 h-12 sm:w-16 sm:h-16 rounded-full object-cover mx-auto mb-3 sm:mb-4"
+            />
             <h2 className="text-xl sm:text-2xl font-bold text-newspaper-blue">ಆಡಳಿತ ಲಾಗಿನ್</h2>
             <p className="text-sm sm:text-base text-gray-600 mt-1 sm:mt-2">ರಾಯಚೂರು ಬೆಳಕು</p>
           </div>

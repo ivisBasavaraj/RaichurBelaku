@@ -23,7 +23,6 @@ const Archive = () => {
       newspaper.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    // Sort newspapers
     filtered.sort((a, b) => {
       switch (sortBy) {
         case 'date-desc':
@@ -53,13 +52,11 @@ const Archive = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 py-6 sm:py-8">
-        {/* Header */}
         <div className="mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold text-newspaper-blue mb-1 sm:mb-2">ಸಂಗ್ರಹಿತ ಪತ್ರಿಕೆಗಳು</h1>
           <p className="text-sm sm:text-base text-gray-600">ಹಿಂದಿನ ಎಲ್ಲಾ ಆವೃತ್ತಿಗಳನ್ನು ಇಲ್ಲಿ ನೋಡಿ</p>
         </div>
 
-        {/* Search and Filter */}
         <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-4 sm:mb-6">
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="flex-1">
@@ -93,14 +90,12 @@ const Archive = () => {
           </div>
         </div>
 
-        {/* Results Count */}
         <div className="mb-3 sm:mb-4">
           <p className="text-sm sm:text-base text-gray-600">
             {filteredNewspapers.length} ಪತ್ರಿಕೆಗಳು ಕಂಡುಬಂದಿವೆ
           </p>
         </div>
 
-        {/* Newspapers Grid */}
         {filteredNewspapers.length === 0 ? (
           <div className="bg-white rounded-lg shadow-md p-8 text-center">
             <div className="text-gray-400 mb-4">
@@ -155,7 +150,7 @@ const Archive = () => {
                   </div>
                 </div>
               </div>
-            ))
+            ))}
           </div>
         )}
       </div>
