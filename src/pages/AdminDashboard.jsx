@@ -45,9 +45,16 @@ const AdminDashboard = () => {
   };
 
   const handlePublishToday = (newspaperId) => {
-    publishToday(newspaperId);
-    setTodaysNewspaper(newspapers.find(n => n.id === newspaperId));
-    alert('ಇಂದಿನ ಪತ್ರಿಕೆಯಾಗಿ ಪ್ರಕಟಿಸಲಾಗಿದೆ!');
+    console.log('Publishing newspaper:', newspaperId);
+    console.log('Available newspapers:', newspapers);
+    const success = publishToday(newspaperId);
+    console.log('Publish success:', success);
+    if (success) {
+      setTodaysNewspaper(newspapers.find(n => n.id === newspaperId));
+      alert('ಇಂದಿನ ಪತ್ರಿಕೆಯಾಗಿ ಪ್ರಕಟಿಸಲಾಗಿದೆ!');
+    } else {
+      alert('ಪ್ರಕಟಿಸಲು ದೋಷ ಸಂಭವಿಸಿದೆ!');
+    }
   };
 
   if (!isLoggedIn) {

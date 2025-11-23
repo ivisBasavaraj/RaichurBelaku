@@ -115,11 +115,10 @@ const AdminUploadPDF = ({ onUploadSuccess }) => {
               <p className="text-sm text-gray-500 mb-4">ಅಥವಾ ಕೆಳಗಿನ ಬಟನ್ ಒತ್ತಿ</p>
               <input
                 type="file"
-                accept=".pdf,application/pdf"
+                accept="application/pdf"
                 onChange={handleFileSelect}
                 className="hidden"
                 id="pdf-upload"
-                capture="environment"
               />
               <div className="bg-newspaper-blue text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg cursor-pointer hover:bg-blue-700 active:bg-blue-800 transition-colors inline-block text-sm sm:text-base">
                 ಫೈಲ್ ಆಯ್ಕೆ ಮಾಡಿ

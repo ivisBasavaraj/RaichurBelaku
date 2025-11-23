@@ -14,6 +14,9 @@ const NewspaperViewer = ({ newspaper }) => {
   }, [newspaper]);
 
   const handleAreaClick = (area) => {
+    console.log('Clicked area data:', area);
+    console.log('Area title:', area.title);
+    console.log('Area content:', area.content);
     if (area.title || area.content) {
       setSelectedNews(area);
     }
@@ -116,7 +119,7 @@ const NewspaperViewer = ({ newspaper }) => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start mb-4">
-              <h3 className="text-xl font-bold text-newspaper-blue">{selectedNews.title}</h3>
+              <h3 className="text-xl font-bold text-newspaper-blue">{selectedNews.title || 'ಸುದ್ದಿ'}</h3>
               <button
                 onClick={closeNewsModal}
                 className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
@@ -137,7 +140,7 @@ const NewspaperViewer = ({ newspaper }) => {
             )}
             
             <div className="text-gray-800 leading-relaxed whitespace-pre-wrap">
-              {selectedNews.content}
+              {selectedNews.content || 'ಈ ಸುದ್ದಿಗೆ ವಿಷಯ ಸೇರಿಸಲಾಗಿಲ್ಲ.'}
             </div>
             
             <div className="mt-6 text-center">

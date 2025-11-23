@@ -5,12 +5,12 @@ import { getNewspapers, getClickableAreas } from '../utils/localStorage';
 const NewsTab = () => {
   const { newspaperId, areaId } = useParams();
   const navigate = useNavigate();
-  const [croppedImageUrl, setCroppedImageUrl] = useState('');
   const [newspaper, setNewspaper] = useState(null);
+  const [area, setArea] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadAndCropImage = async () => {
+    const loadNewsContent = () => {
       try {
         const newspapers = getNewspapers();
         const currentNewspaper = newspapers.find(n => n.id === newspaperId);
@@ -21,44 +21,23 @@ const NewsTab = () => {
         }
         
         const areas = getClickableAreas(newspaperId);
-        const area = areas.find(a => a.id === areaId);
+        const currentArea = areas.find(a => a.id === areaId);
         
-        if (!area) {
+        if (!currentArea) {
           setLoading(false);
           return;
         }
         
         setNewspaper(currentNewspaper);
-        
-        // Create and crop image
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          
-          canvas.width = Math.abs(area.width);
-          canvas.height = Math.abs(area.height);
-          
-          ctx.drawImage(
-            img,
-            area.x, area.y,
-            Math.abs(area.width), Math.abs(area.height),
-            0, 0,
-            Math.abs(area.width), Math.abs(area.height)
-          );
-          
-          setCroppedImageUrl(canvas.toDataURL());
-          setLoading(false);
-        };
-        
-        img.src = currentNewspaper.previewImage;
+        setArea(currentArea);
+        setLoading(false);
       } catch (error) {
-        console.error('Error loading image:', error);
+        console.error('Error loading news content:', error);
         setLoading(false);
       }
     };
 
-    loadAndCropImage();
+    loadNewsContent();
   }, [newspaperId, areaId]);
 
   const handleBackToNewspaper = () => {
@@ -76,11 +55,11 @@ const NewsTab = () => {
     );
   }
 
-  if (!croppedImageUrl || !newspaper) {
+  if (!area || !newspaper) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-xl font-semibold text-gray-700 mb-2">ಚಿತ್ರ ಲಭ್ಯವಿಲ್ಲ</h2>
+          <h2 className="text-xl font-semibold text-gray-700 mb-2">ಸುದ್ದಿ ಲಭ್ಯವಿಲ್ಲ</h2>
           <button
             onClick={handleBackToNewspaper}
             className="bg-newspaper-blue text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
@@ -118,7 +97,7 @@ const NewsTab = () => {
           <div className="p-6 md:p-8">
             <div className="border-l-4 border-newspaper-red pl-4 mb-6">
               <h1 className="text-2xl md:text-3xl font-bold text-gray-900 leading-tight">
-                ಕ್ರಾಪ್ ಮಾಡಿದ ಭಾಗ
+                {area.title || 'ಸುದ್ದಿ'}
               </h1>
             </div>
             
@@ -126,12 +105,19 @@ const NewsTab = () => {
               <span>ರಾಯಚೂರು ಬೆಳಕು</span>
             </div>
             
-            <div className="text-center">
-              <img
-                src={croppedImageUrl}
-                alt="Cropped newspaper section"
-                className="max-w-full h-auto border border-gray-300 rounded-lg shadow-sm"
-              />
+            {area.imageUrl && (
+              <div className="mb-6">
+                <img
+                  src={area.imageUrl}
+                  alt={area.title}
+                  className="w-full h-auto rounded-lg shadow-sm"
+                  onError={(e) => { e.target.style.display = 'none'; }}
+                />
+              </div>
+            )}
+            
+            <div className="text-gray-800 leading-relaxed whitespace-pre-wrap text-lg">
+              {area.content || 'ಈ ಸುದ್ದಿಗೆ ವಿಷಯ ಸೇರಿಸಲಾಗಿಲ್ಲ.'}
             </div>
           </div>
         </div>
