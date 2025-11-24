@@ -117,7 +117,7 @@ const NewspaperViewer = ({ newspaper }) => {
       {/* News Modal */}
       {selectedNews && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start mb-4">
               <h3 className="text-xl font-bold text-newspaper-blue">{selectedNews.title || 'ಸುದ್ದಿ'}</h3>
               <button
@@ -126,6 +126,15 @@ const NewspaperViewer = ({ newspaper }) => {
               >
                 ×
               </button>
+            </div>
+            
+            {/* Show cropped image from the selected area */}
+            <div className="mb-4">
+              <CroppedImage 
+                sourceImage={getCurrentPageImage()}
+                area={selectedNews}
+                alt={selectedNews.title || 'ಸುದ್ದಿ'}
+              />
             </div>
             
             {selectedNews.imageUrl && (
@@ -153,6 +162,58 @@ const NewspaperViewer = ({ newspaper }) => {
             </div>
           </div>
         </div>
+      )}
+    </div>
+  );
+};
+
+// Component to show cropped image from selected area
+const CroppedImage = ({ sourceImage, area, alt }) => {
+  const canvasRef = React.useRef(null);
+  const [croppedImageUrl, setCroppedImageUrl] = useState(null);
+
+  useEffect(() => {
+    const cropImage = () => {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      
+      img.onload = () => {
+        const cropX = Math.min(area.x, area.x + area.width);
+        const cropY = Math.min(area.y, area.y + area.height);
+        const cropWidth = Math.abs(area.width);
+        const cropHeight = Math.abs(area.height);
+        
+        canvas.width = cropWidth;
+        canvas.height = cropHeight;
+        
+        ctx.drawImage(
+          img,
+          cropX, cropY, cropWidth, cropHeight,
+          0, 0, cropWidth, cropHeight
+        );
+        
+        setCroppedImageUrl(canvas.toDataURL());
+      };
+      
+      img.crossOrigin = 'anonymous';
+      img.src = sourceImage;
+    };
+    
+    if (sourceImage && area) {
+      cropImage();
+    }
+  }, [sourceImage, area]);
+
+  return (
+    <div>
+      <canvas ref={canvasRef} style={{ display: 'none' }} />
+      {croppedImageUrl && (
+        <img
+          src={croppedImageUrl}
+          alt={alt}
+          className="w-full h-auto rounded-lg border border-gray-300 shadow-sm"
+        />
       )}
     </div>
   );
