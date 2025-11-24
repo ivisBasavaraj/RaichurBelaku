@@ -91,7 +91,12 @@ const PDFMapper = ({ newspaper }) => {
   };
 
   const handleSaveAll = () => {
+    console.log('Saving areas for newspaper:', newspaper.id, 'Areas count:', areas.length);
+    console.log('Areas data:', areas);
+    
     const success = saveClickableAreas(newspaper.id, areas);
+    console.log('Save areas result:', success);
+    
     if (success) {
       alert('ಎಲ್ಲಾ ಪ್ರದೇಶಗಳನ್ನು ಉಳಿಸಲಾಗಿದೆ!');
     } else {

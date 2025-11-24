@@ -8,7 +8,8 @@ const NewspaperViewer = ({ newspaper }) => {
 
   useEffect(() => {
     if (newspaper) {
-      const clickableAreas = getClickableAreas(newspaper.id);
+      const clickableAreas = newspaper.areas || getClickableAreas(newspaper.id) || [];
+      console.log('Loading areas for newspaper:', newspaper.id, 'Areas:', clickableAreas);
       setAreas(clickableAreas);
     }
   }, [newspaper]);

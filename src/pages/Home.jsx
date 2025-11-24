@@ -1,9 +1,24 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getTodaysNewspaper } from '../utils/localStorage';
 
 const Home = () => {
-  const todaysNewspaper = getTodaysNewspaper();
+  const [todaysNewspaper, setTodaysNewspaper] = useState(null);
+  
+  useEffect(() => {
+    const loadTodaysNewspaper = () => {
+      const newspaper = getTodaysNewspaper();
+      console.log('Loading today\'s newspaper:', newspaper);
+      setTodaysNewspaper(newspaper);
+    };
+    
+    loadTodaysNewspaper();
+    
+    // Refresh every 10 seconds to catch new publications
+    const interval = setInterval(loadTodaysNewspaper, 10000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -41,7 +56,17 @@ const Home = () => {
       <div className="max-w-7xl mx-auto px-4 py-12">
         <div className="text-center mb-8">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">ಇಂದಿನ ಮುಖ್ಯ ಸುದ್ದಿಗಳು</h2>
-          <div className="w-24 h-1 bg-newspaper-red mx-auto"></div>
+          <div className="w-24 h-1 bg-newspaper-red mx-auto mb-4"></div>
+          <button
+            onClick={() => {
+              const newspaper = getTodaysNewspaper();
+              console.log('Manual refresh - today\'s newspaper:', newspaper);
+              setTodaysNewspaper(newspaper);
+            }}
+            className="text-sm text-blue-600 hover:text-blue-800 underline"
+          >
+            ರಿಫ್ರೆಶ್ ಮಾಡಿ
+          </button>
         </div>
 
         {todaysNewspaper ? (

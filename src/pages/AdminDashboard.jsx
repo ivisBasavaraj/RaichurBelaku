@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react';
 import AdminUploadPDF from '../components/AdminUploadPDF';
 import PDFMapper from '../components/PDFMapper';
 import AdminLogin from '../components/AdminLogin';
+import LocalStorageStatus from '../components/LocalStorageStatus';
 import { getNewspapers, publishToday, getTodaysNewspaper, deleteNewspaper, getStorageInfo, clearAllData, createBackup, restoreFromBackup, getDataStats } from '../utils/localStorage';
+import { testLocalStorage, forceSaveTest } from '../utils/localStorageTest';
+import { emergencyReset, forceSaveWithRetry, diagnoseLocalStorage } from '../utils/localStorageFix';
 
 const AdminDashboard = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -26,8 +29,14 @@ const AdminDashboard = () => {
   }, []);
 
   const handleUploadSuccess = (newspaper) => {
+    console.log('Upload success callback called with:', newspaper);
     setCurrentNewspaper(newspaper);
-    setNewspapers(prev => [...prev, newspaper]);
+    
+    // Force refresh newspapers from localStorage
+    const updatedNewspapers = getNewspapers();
+    console.log('Refreshed newspapers from localStorage:', updatedNewspapers.length);
+    setNewspapers(updatedNewspapers);
+    
     setActiveTab('mapper');
   };
 
@@ -63,6 +72,7 @@ const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <LocalStorageStatus />
       <div className="max-w-7xl mx-auto px-4 py-6 sm:py-8">
         <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
           <div>
@@ -437,6 +447,55 @@ const DataManagement = () => {
         <span className="text-sm text-gray-600">
           ({Math.max(0, dataStats.newspaperCount - 10)} ಅಳಿಸಬಹುದು)
         </span>
+      </div>
+
+      {/* Debug Zone */}
+      <div className="mb-6 p-4 border border-blue-200 rounded-lg bg-blue-50">
+        <h3 className="text-lg font-medium text-blue-900 mb-2">ಡೀಬಗ್ ಟೂಲ್ಸ್</h3>
+        <p className="text-sm text-blue-700 mb-4">localStorage ಸಮಸ್ಯೆಗಳನ್ನು ಪರೀಕ್ಷಿಸಿ</p>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => {
+              const result = testLocalStorage();
+              alert(result ? 'localStorage ಕೆಲಸ ಮಾಡುತ್ತಿದೆ! ಕನ್ಸೋಲ್ ಪರೀಕ್ಷಿಸಿ.' : 'localStorage ಸಮಸ್ಯೆ!');
+            }}
+            className="bg-blue-600 text-white py-2 px-3 rounded-lg hover:bg-blue-700 transition-colors text-sm"
+          >
+            ಬೇಸಿಕ್ ಟೆಸ್ಟ್
+          </button>
+          <button
+            onClick={() => {
+              const result = forceSaveTest();
+              alert(result ? 'ಟೆಸ್ಟ್ ಡೇಟಾ ಉಳಿಸಲಾಗಿದೆ!' : 'ಟೆಸ್ಟ್ ಫೇಲ್!');
+              refreshData();
+            }}
+            className="bg-purple-600 text-white py-2 px-3 rounded-lg hover:bg-purple-700 transition-colors text-sm"
+          >
+            ಫೋರ್ಸ್ ಸೇವ್
+          </button>
+          <button
+            onClick={() => {
+              diagnoseLocalStorage();
+              alert('ಡಾಯಗ್ನೋಸಿಸ್ ಪೂರ್ಣ! ಕನ್ಸೋಲ್ ಪರೀಕ್ಷಿಸಿ.');
+            }}
+            className="bg-orange-600 text-white py-2 px-3 rounded-lg hover:bg-orange-700 transition-colors text-sm"
+          >
+            ಡಾಯಗ್ನೋಸಿಸ್
+          </button>
+          <button
+            onClick={() => {
+              if (window.confirm('ಎಲ್ಲಾ ಡೇಟಾ ಅಳಿಸಿ localStorage ರೀಸೆಟ್ ಮಾಡಲು ನಿಶ್ಚಿತವಾಗಿದ್ದೀರಾ?')) {
+                const result = emergencyReset();
+                alert(result ? 'ರೀಸೆಟ್ ಯಶಸ್ವಿ!' : 'ರೀಸೆಟ್ ಫೇಲ್!');
+                refreshData();
+                window.location.reload();
+              }
+            }}
+            className="bg-red-600 text-white py-2 px-3 rounded-lg hover:bg-red-700 transition-colors text-sm"
+          >
+            ಎಮರ್ಜೆನ್ಸಿ ರೀಸೆಟ್
+          </button>
+        </div>
       </div>
 
       {/* Danger Zone */}

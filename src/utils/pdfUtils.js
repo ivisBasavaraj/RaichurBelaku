@@ -13,7 +13,7 @@ export const convertPDFToImage = async (pdfFile) => {
     const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
     const page = await pdf.getPage(1);
     
-    // Optimize scale for better storage efficiency
+    // Good quality scale
     const scale = 1.5;
     const viewport = page.getViewport({ scale });
     
@@ -29,7 +29,7 @@ export const convertPDFToImage = async (pdfFile) => {
     
     await page.render(renderContext).promise;
     
-    // Use JPEG with compression for smaller file size
+    // Good quality
     return {
       imageUrl: canvas.toDataURL('image/jpeg', 0.8),
       width: viewport.width,
@@ -53,14 +53,8 @@ export const convertAllPDFPagesToImages = async (pdfFile) => {
     for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
       const page = await pdf.getPage(pageNum);
       
-      // Optimize scale based on page size
-      const originalViewport = page.getViewport({ scale: 1 });
-      let scale = 1.5;
-      
-      // Reduce scale for very large pages
-      if (originalViewport.width > 1200 || originalViewport.height > 1600) {
-        scale = 1.2;
-      }
+      // Good quality scale
+      const scale = 1.5;
       
       const viewport = page.getViewport({ scale });
       
@@ -76,7 +70,7 @@ export const convertAllPDFPagesToImages = async (pdfFile) => {
       
       await page.render(renderContext).promise;
       
-      // Use JPEG with compression for smaller file size
+      // Good quality
       pages.push({
         pageNumber: pageNum,
         imageUrl: canvas.toDataURL('image/jpeg', 0.8),

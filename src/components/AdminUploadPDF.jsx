@@ -60,11 +60,24 @@ const AdminUploadPDF = ({ onUploadSuccess }) => {
 
   const handleSaveNewspaper = () => {
     if (uploadedNewspaper) {
-      saveNewspaper(uploadedNewspaper);
-      onUploadSuccess(uploadedNewspaper);
-      setUploadedNewspaper(null);
-      setCurrentPage(0);
-      setStorageWarning('');
+      try {
+        localStorage.setItem('newspapers_v2', JSON.stringify([{
+          id: uploadedNewspaper.id,
+          name: uploadedNewspaper.name,
+          date: uploadedNewspaper.date,
+          previewImage: uploadedNewspaper.previewImage,
+          areas: []
+        }]));
+        
+        onUploadSuccess(uploadedNewspaper);
+        setUploadedNewspaper(null);
+        setCurrentPage(0);
+        setStorageWarning('');
+        alert('ಪತ್ರಿಕೆ ಯಶಸ್ವಿಯಾಗಿ ಉಳಿಸಲಾಗಿದೆ!');
+      } catch (error) {
+        console.error('Save error:', error);
+        alert('ಪತ್ರಿಕೆ ಉಳಿಸಲು ದೋಷ ಸಂಭವಿಸಿದೆ!');
+      }
     }
   };
 

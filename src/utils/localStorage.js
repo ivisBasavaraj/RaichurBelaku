@@ -27,54 +27,21 @@ const decompressData = (data) => {
 
 export const saveToLocalStorage = (key, data) => {
   try {
-    if (typeof Storage === 'undefined' || !window.localStorage) {
-      console.warn('localStorage not available');
-      return false;
-    }
-    
-    const compressed = compressData(data);
-    if (!compressed) return false;
-    
-
-    
-    localStorage.setItem(key, compressed);
-    
-    // Verify save
-    const saved = localStorage.getItem(key);
-    if (!saved) {
-      throw new Error('Data not saved properly');
-    }
-    
+    localStorage.setItem(key, JSON.stringify(data));
+    console.log(`✓ Saved ${key}`);
     return true;
   } catch (error) {
-    if (error.name === 'QuotaExceededError') {
-      try {
-        cleanupOldData();
-        localStorage.setItem(key, compressed);
-        return true;
-      } catch (e) {
-        console.error('Storage full:', e);
-      }
-    }
+    console.error(`Error saving ${key}:`, error);
     return false;
   }
 };
 
 export const getFromLocalStorage = (key) => {
   try {
-    if (typeof Storage === 'undefined' || !window.localStorage) {
-      return null;
-    }
-    
     const item = localStorage.getItem(key);
-    return item ? decompressData(item) : null;
+    return item ? JSON.parse(item) : null;
   } catch (error) {
     console.error('Error reading from localStorage:', error);
-    try {
-      localStorage.removeItem(key);
-    } catch (e) {
-      console.error('Could not remove corrupted item:', e);
-    }
     return null;
   }
 };
@@ -195,8 +162,12 @@ export const clearAllData = () => {
 // Optimized newspaper data functions
 export const saveNewspaper = (newspaper) => {
   try {
+    console.log('Saving newspaper:', newspaper.name, 'ID:', newspaper.id);
     const newspapers = getNewspapers();
+    console.log('Current newspapers count:', newspapers.length);
+    
     const existingIndex = newspapers.findIndex(n => n.id === newspaper.id);
+    console.log('Existing index:', existingIndex);
     
     // Optimize newspaper data before saving
     const optimizedNewspaper = {
@@ -213,11 +184,33 @@ export const saveNewspaper = (newspaper) => {
     
     if (existingIndex >= 0) {
       newspapers[existingIndex] = optimizedNewspaper;
+      console.log('Updated existing newspaper at index:', existingIndex);
     } else {
       newspapers.push(optimizedNewspaper);
+      console.log('Added new newspaper, total count:', newspapers.length);
     }
     
-    return saveToLocalStorage(STORAGE_KEYS.NEWSPAPERS, newspapers);
+    let result = saveToLocalStorage(STORAGE_KEYS.NEWSPAPERS, newspapers);
+    console.log('Save result:', result);
+    
+    // If normal save failed, try direct localStorage
+    if (!result) {
+      console.log('Normal save failed, trying direct save...');
+      try {
+        localStorage.setItem(STORAGE_KEYS.NEWSPAPERS, JSON.stringify(newspapers));
+        result = true;
+        console.log('Direct save successful');
+      } catch (directError) {
+        console.error('Direct save failed:', directError);
+        result = false;
+      }
+    }
+    
+    // Verify the save worked
+    const verification = getNewspapers();
+    console.log('Verification - newspapers count after save:', verification.length);
+    
+    return result;
   } catch (error) {
     console.error('Error saving newspaper:', error);
     return false;
@@ -309,20 +302,46 @@ export const getTodaysNewspaper = () => {
 };
 
 export const setTodaysNewspaper = (newspaper) => {
-  return saveToLocalStorage(STORAGE_KEYS.TODAY, newspaper);
+  console.log('Setting today\'s newspaper:', newspaper?.name, 'ID:', newspaper?.id);
+  const result = saveToLocalStorage(STORAGE_KEYS.TODAY, newspaper);
+  console.log('Set today\'s newspaper result:', result);
+  
+  // Verify the save
+  const verification = getTodaysNewspaper();
+  console.log('Verification - today\'s newspaper after save:', verification?.name);
+  
+  return result;
 };
 
 // Optimized area management - now stored with newspaper
 export const saveClickableAreas = (newspaperId, areas) => {
   try {
+    console.log('Saving clickable areas for newspaper:', newspaperId);
+    console.log('Areas to save:', areas.length, areas);
+    
     const newspapers = getNewspapers();
+    console.log('Current newspapers:', newspapers.length);
+    
     const newspaperIndex = newspapers.findIndex(n => n.id === newspaperId);
+    console.log('Found newspaper at index:', newspaperIndex);
     
     if (newspaperIndex >= 0) {
       newspapers[newspaperIndex].areas = areas;
-      return saveToLocalStorage(STORAGE_KEYS.NEWSPAPERS, newspapers);
+      console.log('Updated newspaper areas, saving to localStorage...');
+      
+      const result = saveToLocalStorage(STORAGE_KEYS.NEWSPAPERS, newspapers);
+      console.log('Save areas result:', result);
+      
+      // Verify the save
+      const verification = getNewspapers();
+      const verifyNewspaper = verification.find(n => n.id === newspaperId);
+      console.log('Verification - saved areas count:', verifyNewspaper?.areas?.length || 0);
+      
+      return result;
+    } else {
+      console.error('Newspaper not found with ID:', newspaperId);
+      return false;
     }
-    return false;
   } catch (error) {
     console.error('Error saving areas:', error);
     return false;
