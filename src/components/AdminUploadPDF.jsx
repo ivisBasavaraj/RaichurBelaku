@@ -65,7 +65,11 @@ const AdminUploadPDF = ({ onUploadSuccess }) => {
           id: uploadedNewspaper.id,
           name: uploadedNewspaper.name,
           date: uploadedNewspaper.date,
+          pages: uploadedNewspaper.pages,
+          totalPages: uploadedNewspaper.totalPages,
           previewImage: uploadedNewspaper.previewImage,
+          width: uploadedNewspaper.width,
+          height: uploadedNewspaper.height,
           areas: []
         }]));
         
