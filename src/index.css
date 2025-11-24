@@ -4,6 +4,33 @@
 
 body {
   font-family: 'Noto Sans Kannada', sans-serif;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Optimize font loading */
+@font-face {
+  font-family: 'Noto Sans Kannada';
+  font-display: swap;
+}
+
+/* Improve scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1;
 }
 
 .clickable-area {
@@ -12,17 +39,41 @@ body {
   background-color: rgba(30, 64, 175, 0.1);
   cursor: pointer;
   transition: all 0.3s ease;
+  z-index: 10;
 }
 
 .clickable-area:hover {
   background-color: rgba(30, 64, 175, 0.2);
   border-color: #B91C1C;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .drawing-area {
   position: absolute;
   border: 2px dashed #B91C1C;
   background-color: rgba(185, 28, 28, 0.1);
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* Storage warning animations */
+@keyframes pulse-warning {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.storage-warning {
+  animation: pulse-warning 2s infinite;
+}
+
+/* Loading spinner improvements */
+.loading-spinner {
+  border-top-color: transparent;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* Mobile touch improvements */
@@ -30,6 +81,7 @@ body {
   .clickable-area {
     min-width: 44px;
     min-height: 44px;
+    border-width: 3px; /* Thicker borders for mobile */
   }
   
   /* Improve touch targets */
@@ -41,5 +93,27 @@ body {
   body {
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+  }
+  
+  /* Optimize for touch interactions */
+  .clickable-area:active {
+    background-color: rgba(30, 64, 175, 0.3);
+    transform: scale(0.98);
+  }
+}
+
+/* Print styles for newspaper viewing */
+@media print {
+  .clickable-area {
+    border: 1px solid #000 !important;
+    background: transparent !important;
+  }
+  
+  .drawing-area {
+    display: none;
+  }
+  
+  button {
+    display: none;
   }
 }

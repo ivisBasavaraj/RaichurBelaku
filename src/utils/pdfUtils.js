@@ -1,7 +1,11 @@
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Set worker source
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+// Set worker source with fallback
+try {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+} catch (error) {
+  console.error('PDF.js worker setup error:', error);
+}
 
 export const convertPDFToImage = async (pdfFile) => {
   try {
@@ -9,7 +13,8 @@ export const convertPDFToImage = async (pdfFile) => {
     const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
     const page = await pdf.getPage(1);
     
-    const scale = 2;
+    // Optimize scale for better storage efficiency
+    const scale = 1.5;
     const viewport = page.getViewport({ scale });
     
     const canvas = document.createElement('canvas');
@@ -24,8 +29,9 @@ export const convertPDFToImage = async (pdfFile) => {
     
     await page.render(renderContext).promise;
     
+    // Use JPEG with compression for smaller file size
     return {
-      imageUrl: canvas.toDataURL('image/png'),
+      imageUrl: canvas.toDataURL('image/jpeg', 0.8),
       width: viewport.width,
       height: viewport.height
     };
@@ -42,9 +48,20 @@ export const convertAllPDFPagesToImages = async (pdfFile) => {
     const numPages = pdf.numPages;
     const pages = [];
     
-    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+    const maxPages = numPages;
+    
+    for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
       const page = await pdf.getPage(pageNum);
-      const scale = 2;
+      
+      // Optimize scale based on page size
+      const originalViewport = page.getViewport({ scale: 1 });
+      let scale = 1.5;
+      
+      // Reduce scale for very large pages
+      if (originalViewport.width > 1200 || originalViewport.height > 1600) {
+        scale = 1.2;
+      }
+      
       const viewport = page.getViewport({ scale });
       
       const canvas = document.createElement('canvas');
@@ -59,17 +76,21 @@ export const convertAllPDFPagesToImages = async (pdfFile) => {
       
       await page.render(renderContext).promise;
       
+      // Use JPEG with compression for smaller file size
       pages.push({
         pageNumber: pageNum,
-        imageUrl: canvas.toDataURL('image/png'),
+        imageUrl: canvas.toDataURL('image/jpeg', 0.8),
         width: viewport.width,
         height: viewport.height
       });
     }
     
+
+    
     return {
       pages,
-      totalPages: numPages,
+      totalPages: maxPages,
+      actualPages: numPages,
       previewImage: pages[0].imageUrl,
       width: pages[0].width,
       height: pages[0].height
@@ -89,4 +110,17 @@ export const savePDFFile = (file) => {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+};
+
+// Utility to estimate storage size
+export const estimateStorageSize = (newspaper) => {
+  try {
+    const jsonString = JSON.stringify(newspaper);
+    const sizeInBytes = new Blob([jsonString]).size;
+    const sizeInMB = (sizeInBytes / (1024 * 1024)).toFixed(2);
+    return { bytes: sizeInBytes, mb: sizeInMB };
+  } catch (error) {
+    console.error('Error estimating size:', error);
+    return { bytes: 0, mb: '0.00' };
+  }
 };

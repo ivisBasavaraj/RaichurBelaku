@@ -91,8 +91,12 @@ const PDFMapper = ({ newspaper }) => {
   };
 
   const handleSaveAll = () => {
-    saveClickableAreas(newspaper.id, areas);
-    alert('ಎಲ್ಲಾ ಪ್ರದೇಶಗಳನ್ನು ಉಳಿಸಲಾಗಿದೆ!');
+    const success = saveClickableAreas(newspaper.id, areas);
+    if (success) {
+      alert('ಎಲ್ಲಾ ಪ್ರದೇಶಗಳನ್ನು ಉಳಿಸಲಾಗಿದೆ!');
+    } else {
+      alert('ಪ್ರದೇಶಗಳನ್ನು ಉಳಿಸಲು ದೋಷ ಸಂಭವಿಸಿದೆ!');
+    }
   };
 
   return (
@@ -180,20 +184,26 @@ const PDFMapper = ({ newspaper }) => {
       )}
 
       <div className="mt-3 sm:mt-4">
-        {areas.length > 0 && (
-          <div className="mb-3 sm:mb-4">
+        <div className="mb-3 sm:mb-4 flex flex-col sm:flex-row gap-2">
+          {areas.length > 0 && (
             <button
               onClick={handleSaveAll}
-              className="w-full sm:w-auto bg-green-600 text-white px-4 sm:px-6 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium text-sm sm:text-base"
+              className="bg-green-600 text-white px-4 sm:px-6 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium text-sm sm:text-base"
             >
               ಎಲ್ಲಾ ಪ್ರದೇಶಗಳನ್ನು ಉಳಿಸಿ ({areas.length})
             </button>
+          )}
+          
+          <div className="text-xs sm:text-sm text-gray-600 flex items-center">
+            ಈ ಪುಟದಲ್ಲಿ: {areas.filter(area => area.pageNumber === currentPage + 1).length} ಪ್ರದೇಶಗಳು
           </div>
-        )}
+        </div>
+        
         <div className="text-xs sm:text-sm text-gray-600 space-y-1">
           <p>• ಮೌಸ್ ಡ್ರ್ಯಾಗ್ ಮಾಡಿ ಪ್ರದೇಶವನ್ನು ಆಯ್ಕೆ ಮಾಡಿ</p>
           <p>• ಪ್ರದೇಶವನ್ನು ಕ್ಲಿಕ್ ಮಾಡಿ ವಿಷಯ ಸೇರಿಸಿ</p>
           <p>• ಅಸ್ತಿತ್ವದಲ್ಲಿರುವ ಪ್ರದೇಶಗಳನ್ನು ಅಳಿಸಲು × ಬಟನ್ ಕ್ಲಿಕ್ ಮಾಡಿ</p>
+          <p>• ಪ್ರತಿ ಪುಟದ ಬದಲಾವಣೆಗಳು ಸ್ವಯಂಚಲಿತವಾಗಿ ಉಳಿಸಲಾಗುತ್ತವೆ</p>
         </div>
       </div>
 

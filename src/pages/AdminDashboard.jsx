@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import AdminUploadPDF from '../components/AdminUploadPDF';
 import PDFMapper from '../components/PDFMapper';
 import AdminLogin from '../components/AdminLogin';
-import { getNewspapers, publishToday, getTodaysNewspaper, deleteNewspaper, getStorageInfo, clearAllData, createBackup, restoreFromBackup } from '../utils/localStorage';
+import { getNewspapers, publishToday, getTodaysNewspaper, deleteNewspaper, getStorageInfo, clearAllData, createBackup, restoreFromBackup, getDataStats } from '../utils/localStorage';
 
 const AdminDashboard = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -276,11 +276,17 @@ const ManageNewspapers = ({ newspapers, currentNewspaper, todaysNewspaper, onNew
 // Data Management Component
 const DataManagement = () => {
   const [storageInfo, setStorageInfo] = useState({ used: 0, usedMB: '0.00' });
+  const [dataStats, setDataStats] = useState({ newspaperCount: 0, totalAreas: 0 });
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    setStorageInfo(getStorageInfo());
+    refreshData();
   }, []);
+  
+  const refreshData = () => {
+    setStorageInfo(getStorageInfo());
+    setDataStats(getDataStats());
+  };
 
   const handleBackup = async () => {
     setIsLoading(true);
@@ -333,13 +339,45 @@ const DataManagement = () => {
       
       {/* Storage Info */}
       <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-        <h3 className="text-lg font-medium text-gray-900 mb-2">ಸ್ಟೋರೇಜ್ ಮಾಹಿತಿ</h3>
-        <p className="text-sm text-gray-600">
-          ವರ್ತಮಾನ ವಾಪರಾಶೆ: <span className="font-medium">{storageInfo.usedMB} MB</span>
-        </p>
+        <h3 className="text-lg font-medium text-gray-900 mb-3">ಸ್ಟೋರೇಜ್ ಮಾಹಿತಿ</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+          <div>
+            <p className="text-sm text-gray-600">
+              ಒಟ್ಟು ವಾಪರಾಶೆ: <span className="font-medium">{storageInfo.usedMB} MB</span>
+            </p>
+            <p className="text-sm text-gray-600">
+              ಆಪ್ ಡೇಟಾ: <span className="font-medium">{storageInfo.appUsedMB} MB</span>
+            </p>
+            <p className="text-sm text-gray-600">
+              ಲಭ್ಯವಿರುವ ಸ್ಥಳ: <span className="font-medium">{storageInfo.availableMB} MB</span>
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">
+              ಪತ್ರಿಕೆಗಳು: <span className="font-medium">{dataStats.newspaperCount}</span>
+            </p>
+            <p className="text-sm text-gray-600">
+              ಒಟ್ಟು ಪ್ರದೇಶಗಳು: <span className="font-medium">{dataStats.totalAreas}</span>
+            </p>
+            {dataStats.oldestDate && (
+              <p className="text-sm text-gray-600">
+                ಹಳೆಯ ದಿನಾಂಕ: <span className="font-medium">{dataStats.oldestDate}</span>
+              </p>
+            )}
+          </div>
+        </div>
+        
+        {storageInfo.needsCleanup && (
+          <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
+            <p className="text-sm text-yellow-800">
+              ⚠️ ಸ್ಟೋರೇಜ್ {storageInfo.usagePercent}% ತುಂಬಿದೆ. ಹಳೆಯ ಪತ್ರಿಕೆಗಳನ್ನು ಅಳಿಸಿ.
+            </p>
+          </div>
+        )}
+        
         <button
-          onClick={() => setStorageInfo(getStorageInfo())}
-          className="mt-2 text-sm text-newspaper-blue hover:text-blue-700"
+          onClick={refreshData}
+          className="text-sm text-newspaper-blue hover:text-blue-700"
         >
           ರಿಫ್ರೆಶ್ ಮಾಡಿ
         </button>
@@ -370,6 +408,35 @@ const DataManagement = () => {
             className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-newspaper-blue file:text-white hover:file:bg-blue-700 disabled:opacity-50"
           />
         </div>
+      </div>
+
+      {/* Cleanup Options */}
+      <div className="mb-6 p-4 border border-orange-200 rounded-lg bg-orange-50">
+        <h3 className="text-lg font-medium text-orange-900 mb-2">ಸ್ಟೋರೇಜ್ ಕ್ಲೀನಪ್</h3>
+        <p className="text-sm text-orange-700 mb-4">ಸ್ಟೋರೇಜ್ ಸ್ಥಳ ಉಳಿಸಲು ಹಳೆಯ ಪತ್ರಿಕೆಗಳನ್ನು ಅಳಿಸಿ</p>
+        <button
+          onClick={() => {
+            if (window.confirm('10 ಕ್ಕಿಂತ ಹಳೆಯ ಪತ್ರಿಕೆಗಳನ್ನು ಅಳಿಸಲು ನಿಶ್ಚಿತವಾಗಿದ್ದೀರಾ?')) {
+              const newspapers = getNewspapers();
+              if (newspapers.length > 10) {
+                const sorted = newspapers.sort((a, b) => new Date(b.date) - new Date(a.date));
+                const toDelete = sorted.slice(10);
+                toDelete.forEach(n => deleteNewspaper(n.id));
+                alert(`${toDelete.length} ಹಳೆಯ ಪತ್ರಿಕೆಗಳನ್ನು ಅಳಿಸಲಾಗಿದೆ`);
+                refreshData();
+              } else {
+                alert('ಅಳಿಸಲು ಹಳೆಯ ಪತ್ರಿಕೆಗಳಿಲ್ಲ');
+              }
+            }
+          }}
+          disabled={isLoading || dataStats.newspaperCount <= 10}
+          className="bg-orange-600 text-white py-2 px-4 rounded-lg hover:bg-orange-700 disabled:opacity-50 transition-colors mr-3"
+        >
+          ಹಳೆಯ ಪತ್ರಿಕೆಗಳನ್ನು ಅಳಿಸಿ
+        </button>
+        <span className="text-sm text-gray-600">
+          ({Math.max(0, dataStats.newspaperCount - 10)} ಅಳಿಸಬಹುದು)
+        </span>
       </div>
 
       {/* Danger Zone */}

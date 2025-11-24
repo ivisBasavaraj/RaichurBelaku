@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
-import { convertAllPDFPagesToImages, savePDFFile } from '../utils/pdfUtils';
-import { saveNewspaper } from '../utils/localStorage';
+import { convertAllPDFPagesToImages, savePDFFile, estimateStorageSize } from '../utils/pdfUtils';
+import { saveNewspaper, getStorageInfo } from '../utils/localStorage';
 
 const AdminUploadPDF = ({ onUploadSuccess }) => {
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [uploadedNewspaper, setUploadedNewspaper] = useState(null);
   const [currentPage, setCurrentPage] = useState(0);
+  const [storageWarning, setStorageWarning] = useState('');
 
   const handleFileUpload = async (file) => {
     if (!file || file.type !== 'application/pdf') {
       alert('ದಯವಿಟ್ಟು ಮಾನ್ಯವಾದ PDF ಫೈಲ್ ಅನ್ನು ಆಯ್ಕೆ ಮಾಡಿ');
       return;
     }
+    
+
 
     setUploading(true);
     try {
@@ -28,14 +31,25 @@ const AdminUploadPDF = ({ onUploadSuccess }) => {
         pdfData,
         pages: pagesData.pages,
         totalPages: pagesData.totalPages,
+        actualPages: pagesData.actualPages,
         previewImage: pagesData.previewImage,
         width: pagesData.width,
-        height: pagesData.height
+        height: pagesData.height,
+        areas: [] // Initialize empty areas array
       };
 
+      // Show size estimate
+      const sizeEstimate = estimateStorageSize(newspaper);
+      console.log(`Newspaper size estimate: ${sizeEstimate.mb} MB`);
+      
       setUploadedNewspaper(newspaper);
       setCurrentPage(0);
-      alert('PDF ಯಶಸ್ವಿಯಾಗಿ ಅಪ್ಲೋಡ್ ಆಗಿದೆ!');
+      
+      let message = 'PDF ಯಶಸ್ವಿಯಾಗಿ ಅಪ್ಲೋಡ್ ಆಗಿದೆ!';
+      if (pagesData.actualPages > pagesData.totalPages) {
+        message += `\nಗಮನಿಸಿ: ${pagesData.actualPages} ಪುಟಗಳಿಂದ ${pagesData.totalPages} ಪುಟಗಳನ್ನು ಮಾತ್ರ ಪ್ರಕ್ರಿಯೆಗೊಳಿಸಲಾಗಿದೆ.`;
+      }
+      alert(message);
     } catch (error) {
       console.error('Upload error:', error);
       alert('PDF ಅಪ್ಲೋಡ್ ಮಾಡುವಲ್ಲಿ ದೋಷ ಸಂಭವಿಸಿದೆ');
@@ -50,6 +64,7 @@ const AdminUploadPDF = ({ onUploadSuccess }) => {
       onUploadSuccess(uploadedNewspaper);
       setUploadedNewspaper(null);
       setCurrentPage(0);
+      setStorageWarning('');
     }
   };
 
@@ -115,7 +130,7 @@ const AdminUploadPDF = ({ onUploadSuccess }) => {
               <p className="text-sm text-gray-500 mb-4">ಅಥವಾ ಕೆಳಗಿನ ಬಟನ್ ಒತ್ತಿ</p>
               <input
                 type="file"
-                accept="application/pdf"
+                accept="application/pdf,.pdf"
                 onChange={handleFileSelect}
                 className="hidden"
                 id="pdf-upload"
@@ -128,10 +143,23 @@ const AdminUploadPDF = ({ onUploadSuccess }) => {
         </div>
       ) : (
         <div>
-          <div className="mb-3 sm:mb-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-            <h3 className="text-base sm:text-lg font-medium text-gray-900 truncate">{uploadedNewspaper.name}</h3>
-            <div className="text-xs sm:text-sm text-gray-600">
-              ಪುಟ {currentPage + 1} / {uploadedNewspaper.totalPages}
+          <div className="mb-3 sm:mb-4">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-2">
+              <h3 className="text-base sm:text-lg font-medium text-gray-900 truncate">{uploadedNewspaper.name}</h3>
+              <div className="text-xs sm:text-sm text-gray-600">
+                ಪುಟ {currentPage + 1} / {uploadedNewspaper.totalPages}
+                {uploadedNewspaper.actualPages > uploadedNewspaper.totalPages && (
+                  <span className="text-orange-600 ml-2">
+                    (ಒಟ್ಟು: {uploadedNewspaper.actualPages})
+                  </span>
+                )}
+              </div>
+            </div>
+            
+
+            
+            <div className="text-xs text-gray-500">
+              ಅನುಮಾನಿತ ಗಾತ್ರ: {estimateStorageSize(uploadedNewspaper).mb} MB
             </div>
           </div>
           
@@ -158,6 +186,7 @@ const AdminUploadPDF = ({ onUploadSuccess }) => {
                 onClick={() => {
                   setUploadedNewspaper(null);
                   setCurrentPage(0);
+                  setStorageWarning('');
                 }}
                 className="bg-gray-500 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-600 text-sm sm:text-base"
               >
