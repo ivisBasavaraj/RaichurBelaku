@@ -45,38 +45,44 @@ const Home = () => {
         </div>
 
         {todaysNewspaper ? (
-          <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-            <div className="md:flex">
-              <div className="md:w-1/2">
-                <img
-                  src={todaysNewspaper.previewImage}
-                  alt="Today's newspaper"
-                  className="w-full h-64 md:h-full object-cover"
-                />
-              </div>
-              <div className="md:w-1/2 p-8">
-                <div className="flex items-center mb-4">
-                  <div className="w-3 h-3 bg-newspaper-red rounded-full mr-3"></div>
-                  <span className="text-sm text-gray-600">
-                    {new Date(todaysNewspaper.date).toLocaleDateString('kn-IN')}
-                  </span>
+          <div className="space-y-8">
+            {/* Main Newspaper Display */}
+            <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+              <div className="md:flex">
+                <div className="md:w-1/2">
+                  <img
+                    src={todaysNewspaper.previewImage}
+                    alt="Today's newspaper"
+                    className="w-full h-64 md:h-full object-cover"
+                  />
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">ಇಂದಿನ ಆವೃತ್ತಿ</h3>
-                <p className="text-gray-600 mb-6">
-                  ಇಂದಿನ ಎಲ್ಲಾ ಪ್ರಮುಖ ಸುದ್ದಿಗಳು, ಸ್ಥಳೀಯ ಮಾಹಿತಿ ಮತ್ತು ವಿಶೇಷ ಲೇಖನಗಳನ್ನು ಓದಿ. 
-                  ಪ್ರತಿ ಸುದ್ದಿಯನ್ನು ವಿವರವಾಗಿ ತಿಳಿಯಲು ಪತ್ರಿಕೆಯ ಮೇಲೆ ಕ್ಲಿಕ್ ಮಾಡಿ.
-                </p>
-                <Link
-                  to="/today"
-                  className="inline-flex items-center bg-newspaper-blue text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  ಪತ್ರಿಕೆ ಓದಿ
-                  <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                  </svg>
-                </Link>
+                <div className="md:w-1/2 p-8">
+                  <div className="flex items-center mb-4">
+                    <div className="w-3 h-3 bg-newspaper-red rounded-full mr-3"></div>
+                    <span className="text-sm text-gray-600">
+                      {new Date(todaysNewspaper.date).toLocaleDateString('kn-IN')}
+                    </span>
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-4">ಇಂದಿನ ಆವೃತ್ತಿ</h3>
+                  <p className="text-gray-600 mb-6">
+                    ಇಂದಿನ ಎಲ್ಲಾ ಪ್ರಮುಖ ಸುದ್ದಿಗಳು, ಸ್ಥಳೀಯ ಮಾಹಿತಿ ಮತ್ತು ವಿಶೇಷ ಲೇಖನಗಳನ್ನು ಓದಿ. 
+                    ಪ್ರತಿ ಸುದ್ದಿಯನ್ನು ವಿವರವಾಗಿ ತಿಳಿಯಲು ಪತ್ರಿಕೆಯ ಮೇಲೆ ಕ್ಲಿಕ್ ಮಾಡಿ.
+                  </p>
+                  <Link
+                    to="/today"
+                    className="inline-flex items-center bg-newspaper-blue text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    ಪತ್ರಿಕೆ ಓದಿ
+                    <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </Link>
+                </div>
               </div>
             </div>
+
+            {/* News Headlines Grid */}
+            <TodaysHeadlines newspaper={todaysNewspaper} />
           </div>
         ) : (
           <div className="bg-white rounded-lg shadow-lg p-8 text-center">
@@ -144,6 +150,77 @@ const Home = () => {
           </p>
         </div>
       </div>
+    </div>
+  );
+};
+
+// Component to display today's news headlines
+const TodaysHeadlines = ({ newspaper }) => {
+  const [areas, setAreas] = React.useState([]);
+
+  React.useEffect(() => {
+    if (newspaper && newspaper.areas) {
+      // Filter areas that have titles (actual news)
+      const newsAreas = newspaper.areas.filter(area => area.title && area.title.trim());
+      setAreas(newsAreas);
+    }
+  }, [newspaper]);
+
+  if (areas.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow-lg p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-2xl font-bold text-gray-900">ಇಂದಿನ ಮುಖ್ಯ ಸುದ್ದಿಗಳು</h3>
+        <Link
+          to="/today"
+          className="text-newspaper-blue hover:text-blue-700 text-sm font-medium"
+        >
+          ಎಲ್ಲಾ ಸುದ್ದಿಗಳು →
+        </Link>
+      </div>
+      
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {areas.slice(0, 6).map((area, index) => (
+          <div key={area.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+            <div className="flex items-start space-x-3">
+              <div className="w-2 h-2 bg-newspaper-red rounded-full mt-2 flex-shrink-0"></div>
+              <div className="flex-1">
+                <h4 className="font-semibold text-gray-900 mb-2 line-clamp-2">
+                  {area.title}
+                </h4>
+                {area.content && (
+                  <p className="text-sm text-gray-600 line-clamp-3 mb-3">
+                    {area.content.substring(0, 120)}...
+                  </p>
+                )}
+                <Link
+                  to="/today"
+                  className="text-xs text-newspaper-blue hover:text-blue-700 font-medium"
+                >
+                  ಸಂಪೂರ್ಣ ಸುದ್ದಿ ಓದಿ →
+                </Link>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      {areas.length > 6 && (
+        <div className="text-center mt-6">
+          <Link
+            to="/today"
+            className="inline-flex items-center bg-newspaper-blue text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            ಇನ್ನಷ್ಟು ಸುದ್ದಿಗಳು ({areas.length - 6})
+            <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
+        </div>
+      )}
     </div>
   );
 };

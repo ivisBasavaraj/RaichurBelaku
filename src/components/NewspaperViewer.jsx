@@ -70,7 +70,7 @@ const NewspaperViewer = ({ newspaper }) => {
         <img
           src={getCurrentPageImage()}
           alt={`Newspaper page ${currentPage + 1}`}
-          className="w-full h-auto border border-gray-300 rounded-lg shadow-sm"
+          className="newspaper-viewer-image w-full h-auto border border-gray-300 rounded-lg shadow-sm"
         />
         
         {areas.filter(area => area.pageNumber === currentPage + 1).map(area => (
@@ -170,6 +170,7 @@ const NewspaperViewer = ({ newspaper }) => {
 // Component to show cropped image from selected area
 const CroppedImage = ({ sourceImage, area, alt }) => {
   const canvasRef = React.useRef(null);
+  const imgRef = React.useRef(null);
   const [croppedImageUrl, setCroppedImageUrl] = useState(null);
 
   useEffect(() => {
@@ -179,13 +180,26 @@ const CroppedImage = ({ sourceImage, area, alt }) => {
       const img = new Image();
       
       img.onload = () => {
-        const cropX = Math.min(area.x, area.x + area.width);
-        const cropY = Math.min(area.y, area.y + area.height);
-        const cropWidth = Math.abs(area.width);
-        const cropHeight = Math.abs(area.height);
+        // Get the displayed image element to calculate scale
+        const displayedImg = document.querySelector('.newspaper-viewer-image');
+        if (!displayedImg) return;
         
-        canvas.width = cropWidth;
-        canvas.height = cropHeight;
+        const scaleX = img.naturalWidth / displayedImg.clientWidth;
+        const scaleY = img.naturalHeight / displayedImg.clientHeight;
+        
+        const cropX = Math.min(area.x, area.x + area.width) * scaleX;
+        const cropY = Math.min(area.y, area.y + area.height) * scaleY;
+        const cropWidth = Math.abs(area.width) * scaleX;
+        const cropHeight = Math.abs(area.height) * scaleY;
+        
+        // Set canvas size with better quality
+        const scale = 2; // For better quality
+        canvas.width = cropWidth * scale;
+        canvas.height = cropHeight * scale;
+        
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.scale(scale, scale);
         
         ctx.drawImage(
           img,
@@ -193,7 +207,7 @@ const CroppedImage = ({ sourceImage, area, alt }) => {
           0, 0, cropWidth, cropHeight
         );
         
-        setCroppedImageUrl(canvas.toDataURL());
+        setCroppedImageUrl(canvas.toDataURL('image/png', 1.0));
       };
       
       img.crossOrigin = 'anonymous';
@@ -201,19 +215,23 @@ const CroppedImage = ({ sourceImage, area, alt }) => {
     };
     
     if (sourceImage && area) {
-      cropImage();
+      setTimeout(cropImage, 100); // Small delay to ensure image is rendered
     }
   }, [sourceImage, area]);
 
   return (
-    <div>
+    <div className="bg-gray-50 p-4 rounded-lg">
       <canvas ref={canvasRef} style={{ display: 'none' }} />
-      {croppedImageUrl && (
+      {croppedImageUrl ? (
         <img
+          ref={imgRef}
           src={croppedImageUrl}
           alt={alt}
-          className="w-full h-auto rounded-lg border border-gray-300 shadow-sm"
+          className="max-w-full h-auto mx-auto rounded border border-gray-300 shadow-sm bg-white"
+          style={{ maxHeight: '400px' }}
         />
+      ) : (
+        <div className="text-center py-4 text-gray-500">Loading cropped image...</div>
       )}
     </div>
   );
