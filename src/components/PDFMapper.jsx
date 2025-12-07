@@ -1,20 +1,30 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { saveClickableAreas, getClickableAreas } from '../utils/localStorage';
+import { saveClickableAreas, getClickableAreas } from '../utils/hybridStorage';
 
-const PDFMapper = ({ newspaper }) => {
+const PDFMapper = ({ newspaper, onNavigateToManage, onAreasSaved }) => {
   const [areas, setAreas] = useState([]);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentArea, setCurrentArea] = useState(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [selectedArea, setSelectedArea] = useState(null);
-  const [showContentForm, setShowContentForm] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
   const imageRef = useRef(null);
 
   useEffect(() => {
-    if (newspaper) {
-      const savedAreas = getClickableAreas(newspaper.id);
-      setAreas(savedAreas);
-    }
+    const loadAreas = async () => {
+      if (newspaper) {
+        try {
+          const savedAreas = await getClickableAreas(newspaper.id);
+          setAreas(savedAreas);
+        } catch (error) {
+          console.error('Error loading areas:', error);
+          setAreas([]);
+        }
+      }
+    };
+    
+    loadAreas();
   }, [newspaper]);
 
   const handleMouseDown = (e) => {
@@ -47,14 +57,13 @@ const PDFMapper = ({ newspaper }) => {
       const newArea = {
         id: Date.now().toString(),
         ...currentArea,
-        title: '',
-        content: '',
+        title: `ಸುದ್ದಿ ${areas.length + 1}`,
+        content: 'ಈ ಪ್ರದೇಶದ ವಿವರಗಳು ಚಿತ್ರದಲ್ಲಿ ಲಭ್ಯವಿದೆ.',
         imageUrl: '',
         pageNumber: currentPage + 1
       };
       setAreas(prev => [...prev, newArea]);
-      setSelectedArea(newArea);
-      setShowContentForm(true);
+      // Remove auto-save - let admin manually save
     }
     setCurrentArea(null);
     setIsDrawing(false);
@@ -63,44 +72,33 @@ const PDFMapper = ({ newspaper }) => {
   const deleteArea = (areaId) => {
     const updatedAreas = areas.filter(area => area.id !== areaId);
     setAreas(updatedAreas);
-    if (selectedArea && selectedArea.id === areaId) {
-      setSelectedArea(null);
-      setShowContentForm(false);
-    }
   };
 
   const handleAreaClick = (area) => {
     setSelectedArea(area);
-    setShowContentForm(true);
   };
 
-  const handleContentSave = (contentData) => {
-    const updatedAreas = areas.map(area => 
-      area.id === selectedArea.id 
-        ? { ...area, ...contentData }
-        : area
-    );
-    setAreas(updatedAreas);
-    setShowContentForm(false);
-    setSelectedArea(null);
-  };
-
-  const handleContentCancel = () => {
-    setShowContentForm(false);
-    setSelectedArea(null);
-  };
-
-  const handleSaveAll = () => {
+  const handleSaveAll = async () => {
+    setIsSaving(true);
     console.log('Saving areas for newspaper:', newspaper.id, 'Areas count:', areas.length);
-    console.log('Areas data:', areas);
     
-    const success = saveClickableAreas(newspaper.id, areas);
-    console.log('Save areas result:', success);
-    
-    if (success) {
-      alert('ಎಲ್ಲಾ ಪ್ರದೇಶಗಳನ್ನು ಉಳಿಸಲಾಗಿದೆ!');
-    } else {
+    try {
+      const success = await saveClickableAreas(newspaper.id, areas);
+      
+      if (success) {
+        alert('ಎಲ್ಲಾ ಪ್ರದೇಶಗಳನ್ನು ಯಶಸ್ವಿಯಾಗಿ ಉಳಿಸಲಾಗಿದೆ!');
+        // Call refresh callback
+        if (onAreasSaved) {
+          onAreasSaved();
+        }
+      } else {
+        alert('ಪ್ರದೇಶಗಳನ್ನು ಉಳಿಸಲು ದೋಷ ಸಂಭವಿಸಿದೆ!');
+      }
+    } catch (error) {
+      console.error('Error saving areas:', error);
       alert('ಪ್ರದೇಶಗಳನ್ನು ಉಳಿಸಲು ದೋಷ ಸಂಭವಿಸಿದೆ!');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -189,16 +187,47 @@ const PDFMapper = ({ newspaper }) => {
       )}
 
       <div className="mt-3 sm:mt-4">
+        {/* Save and Publish Workflow */}
+        {areas.length > 0 && (
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h3 className="text-lg font-medium text-blue-900 mb-3">ಪ್ರದೇಶ ಮ್ಯಾಪಿಂಗ್ ಪೂರ್ಣಗೋಂಡಿದೆ</h3>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={handleSaveAll}
+                disabled={isSaving}
+                className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
+              >
+                {isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                    ಉಳಿಸಲಾಗುತ್ತಿದೆ...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    ಪ್ರದೇಶಗಳನ್ನು ಉಳಿಸಿ ({areas.length})
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => onNavigateToManage && onNavigateToManage()}
+                className="bg-newspaper-blue text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+                ಪ್ರಕಟಿಸಲು ಹೋಗಿ
+              </button>
+            </div>
+            <p className="text-sm text-blue-700 mt-2">
+              ಮುಂದೆ ಪ್ರದೇಶಗಳನ್ನು ಉಳಿಸಿ, ಅನಂತರ ಪ್ರಕಟಿಸಲು ಹೋಗಿ
+            </p>
+          </div>
+        )}
+        
         <div className="mb-3 sm:mb-4 flex flex-col sm:flex-row gap-2">
-          {areas.length > 0 && (
-            <button
-              onClick={handleSaveAll}
-              className="bg-green-600 text-white px-4 sm:px-6 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium text-sm sm:text-base"
-            >
-              ಎಲ್ಲಾ ಪ್ರದೇಶಗಳನ್ನು ಉಳಿಸಿ ({areas.length})
-            </button>
-          )}
-          
           <div className="text-xs sm:text-sm text-gray-600 flex items-center">
             ಈ ಪುಟದಲ್ಲಿ: {areas.filter(area => area.pageNumber === currentPage + 1).length} ಪ್ರದೇಶಗಳು
           </div>
@@ -212,93 +241,11 @@ const PDFMapper = ({ newspaper }) => {
         </div>
       </div>
 
-      {/* Content Form Modal */}
-      {showContentForm && selectedArea && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold text-newspaper-blue mb-4">ಸುದ್ದಿ ವಿಷಯ ಸೇರಿಸಿ</h3>
-            <ContentForm
-              area={selectedArea}
-              onSave={handleContentSave}
-              onCancel={handleContentCancel}
-            />
-          </div>
-        </div>
-      )}
+
     </div>
   );
 };
 
-// Content Form Component
-const ContentForm = ({ area, onSave, onCancel }) => {
-  const [title, setTitle] = useState(area.title || '');
-  const [content, setContent] = useState(area.content || '');
-  const [imageUrl, setImageUrl] = useState(area.imageUrl || '');
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSave({ title, content, imageUrl });
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          ಸುದ್ದಿ ಶೀರ್ಷಿಕೆ
-        </label>
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-newspaper-blue"
-          placeholder="ಸುದ್ದಿ ಶೀರ್ಷಿಕೆ ನಮೂದಿಸಿ..."
-          required
-        />
-      </div>
-      
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          ಸುದ್ದಿ ವಿಷಯ
-        </label>
-        <textarea
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          rows={4}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-newspaper-blue"
-          placeholder="ಸುದ್ದಿ ವಿಷಯ ನಮೂದಿಸಿ..."
-        />
-      </div>
-      
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          ಚಿತ್ರ URL (ಐಚ್ಛಿಕ)
-        </label>
-        <input
-          type="url"
-          value={imageUrl}
-          onChange={(e) => setImageUrl(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-newspaper-blue"
-          placeholder="https://example.com/image.jpg"
-        />
-      </div>
-      
-      <div className="flex space-x-3 pt-4">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="flex-1 bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600 transition-colors"
-        >
-          ರದ್ದುಮಾಡಿ
-        </button>
-        <button
-          type="submit"
-          className="flex-1 bg-newspaper-blue text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
-        >
-          ಉಳಿಸಿ
-        </button>
-      </div>
-    </form>
-  );
-};
 
 export default PDFMapper;

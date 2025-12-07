@@ -3,9 +3,14 @@ import AdminUploadPDF from '../components/AdminUploadPDF';
 import PDFMapper from '../components/PDFMapper';
 import AdminLogin from '../components/AdminLogin';
 import LocalStorageStatus from '../components/LocalStorageStatus';
-import { getNewspapers, publishToday, getTodaysNewspaper, deleteNewspaper, getStorageInfo, clearAllData, createBackup, restoreFromBackup, getDataStats } from '../utils/localStorage';
-import { testLocalStorage, forceSaveTest } from '../utils/localStorageTest';
-import { emergencyReset, forceSaveWithRetry, diagnoseLocalStorage } from '../utils/localStorageFix';
+import FirebaseSetup from '../components/FirebaseSetup';
+import { 
+  getNewspapers, 
+  publishToday, 
+  getTodaysNewspaper, 
+  deleteNewspaper, 
+  getStorageStatus 
+} from '../utils/hybridStorage';
 
 const AdminDashboard = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -14,28 +19,38 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('upload');
   const [todaysNewspaper, setTodaysNewspaper] = useState(null);
 
-  useEffect(() => {
-    const loadNewspapers = () => {
-      const savedNewspapers = getNewspapers();
+  const loadNewspapers = async () => {
+    try {
+      const savedNewspapers = await getNewspapers();
       setNewspapers(savedNewspapers);
-      setTodaysNewspaper(getTodaysNewspaper());
       
-      if (savedNewspapers.length > 0) {
+      const todaysNews = await getTodaysNewspaper();
+      setTodaysNewspaper(todaysNews);
+      
+      if (savedNewspapers.length > 0 && !currentNewspaper) {
         setCurrentNewspaper(savedNewspapers[savedNewspapers.length - 1]);
       }
-    };
-    
+    } catch (error) {
+      console.error('Error loading newspapers:', error);
+    }
+  };
+
+  useEffect(() => {
     loadNewspapers();
   }, []);
 
-  const handleUploadSuccess = (newspaper) => {
+  const handleUploadSuccess = async (newspaper) => {
     console.log('Upload success callback called with:', newspaper);
     setCurrentNewspaper(newspaper);
     
-    // Force refresh newspapers from localStorage
-    const updatedNewspapers = getNewspapers();
-    console.log('Refreshed newspapers from localStorage:', updatedNewspapers.length);
-    setNewspapers(updatedNewspapers);
+    // Force refresh newspapers from storage
+    try {
+      const updatedNewspapers = await getNewspapers();
+      console.log('Refreshed newspapers from storage:', updatedNewspapers.length);
+      setNewspapers(updatedNewspapers);
+    } catch (error) {
+      console.error('Error refreshing newspapers:', error);
+    }
     
     setActiveTab('mapper');
   };
@@ -53,15 +68,21 @@ const AdminDashboard = () => {
     setIsLoggedIn(false);
   };
 
-  const handlePublishToday = (newspaperId) => {
+  const handlePublishToday = async (newspaperId) => {
     console.log('Publishing newspaper:', newspaperId);
     console.log('Available newspapers:', newspapers);
-    const success = publishToday(newspaperId);
-    console.log('Publish success:', success);
-    if (success) {
-      setTodaysNewspaper(newspapers.find(n => n.id === newspaperId));
-      alert('ಇಂದಿನ ಪತ್ರಿಕೆಯಾಗಿ ಪ್ರಕಟಿಸಲಾಗಿದೆ!');
-    } else {
+    try {
+      const success = await publishToday(newspaperId);
+      console.log('Publish success:', success);
+      if (success) {
+        setTodaysNewspaper(newspapers.find(n => n.id === newspaperId));
+        const storageStatus = await getStorageStatus();
+        alert(`ಇಂದಿನ ಪತ್ರಿಕೆಯಾಗಿ ಪ್ರಕಟಿಸಲಾಗಿದೆ! (${storageStatus.storageType})`);
+      } else {
+        alert('ಪ್ರಕಟಿಸಲು ದೋಷ ಸಂಭವಿಸಿದೆ!');
+      }
+    } catch (error) {
+      console.error('Error publishing:', error);
       alert('ಪ್ರಕಟಿಸಲು ದೋಷ ಸಂಭವಿಸಿದೆ!');
     }
   };
@@ -74,6 +95,7 @@ const AdminDashboard = () => {
     <div className="min-h-screen bg-gray-50">
       <LocalStorageStatus />
       <div className="max-w-7xl mx-auto px-4 py-6 sm:py-8">
+        <FirebaseSetup />
         <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-newspaper-blue mb-1 sm:mb-2">ಆಡಳಿತ ಡ್ಯಾಶ್ಬೋರ್ಡ್</h1>
@@ -143,7 +165,14 @@ const AdminDashboard = () => {
           {activeTab === 'mapper' && (
             <div>
               {currentNewspaper ? (
-                <PDFMapper newspaper={currentNewspaper} />
+                <PDFMapper 
+                  newspaper={currentNewspaper} 
+                  onNavigateToManage={() => {
+                    loadNewspapers(); // Refresh newspapers after mapping
+                    setActiveTab('manage');
+                  }}
+                  onAreasSaved={loadNewspapers} // Refresh when areas are saved
+                />
               ) : (
                 <div className="bg-white rounded-lg shadow-md p-8 text-center">
                   <div className="text-gray-400 mb-4">
@@ -169,10 +198,10 @@ const AdminDashboard = () => {
                 handleNewspaperSelect(newspaper);
                 setActiveTab('mapper');
               }}
-              onDeleteNewspaper={(newspaperId) => {
+              onDeleteNewspaper={async (newspaperId) => {
                 if (window.confirm('ಈ ಪತ್ರಿಕೆಯನ್ನು ಅಳಿಸಲು ನಿಶ್ಚಿತವಾಗಿದ್ದೀರಾ?')) {
-                  deleteNewspaper(newspaperId);
-                  setNewspapers(getNewspapers());
+                  await deleteNewspaper(newspaperId);
+                  await loadNewspapers();
                   if (currentNewspaper?.id === newspaperId) {
                     setCurrentNewspaper(null);
                   }
@@ -285,17 +314,20 @@ const ManageNewspapers = ({ newspapers, currentNewspaper, todaysNewspaper, onNew
 
 // Data Management Component
 const DataManagement = () => {
-  const [storageInfo, setStorageInfo] = useState({ used: 0, usedMB: '0.00' });
-  const [dataStats, setDataStats] = useState({ newspaperCount: 0, totalAreas: 0 });
+  const [newspapers, setNewspapers] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     refreshData();
   }, []);
   
-  const refreshData = () => {
-    setStorageInfo(getStorageInfo());
-    setDataStats(getDataStats());
+  const refreshData = async () => {
+    try {
+      const data = await getNewspapers();
+      setNewspapers(data);
+    } catch (error) {
+      console.error('Error loading newspapers:', error);
+    }
   };
 
   const handleBackup = async () => {
@@ -349,41 +381,25 @@ const DataManagement = () => {
       
       {/* Storage Info */}
       <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-        <h3 className="text-lg font-medium text-gray-900 mb-3">ಸ್ಟೋರೇಜ್ ಮಾಹಿತಿ</h3>
+        <h3 className="text-lg font-medium text-gray-900 mb-3">ಸುಪಾಬೇಸ್ ಮಾಹಿತಿ</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
           <div>
             <p className="text-sm text-gray-600">
-              ಒಟ್ಟು ವಾಪರಾಶೆ: <span className="font-medium">{storageInfo.usedMB} MB</span>
+              ಸ್ಟೋರೇಜ್ ಪ್ರಕಾರ: <span className="font-medium text-green-600">Supabase Cloud Storage</span>
             </p>
             <p className="text-sm text-gray-600">
-              ಆಪ್ ಡೇಟಾ: <span className="font-medium">{storageInfo.appUsedMB} MB</span>
-            </p>
-            <p className="text-sm text-gray-600">
-              ಲಭ್ಯವಿರುವ ಸ್ಥಳ: <span className="font-medium">{storageInfo.availableMB} MB</span>
+              ಪತ್ರಿಕೆಗಳು: <span className="font-medium">{newspapers.length}</span>
             </p>
           </div>
           <div>
             <p className="text-sm text-gray-600">
-              ಪತ್ರಿಕೆಗಳು: <span className="font-medium">{dataStats.newspaperCount}</span>
+              ಒಟ್ಟು ಪ್ರದೇಶಗಳು: <span className="font-medium">{newspapers.reduce((sum, n) => sum + (n.areas?.length || 0), 0)}</span>
             </p>
             <p className="text-sm text-gray-600">
-              ಒಟ್ಟು ಪ್ರದೇಶಗಳು: <span className="font-medium">{dataStats.totalAreas}</span>
+              ಸ್ಥಿತಿ: <span className="font-medium text-green-600">ಆನ್ಲೈನ್</span>
             </p>
-            {dataStats.oldestDate && (
-              <p className="text-sm text-gray-600">
-                ಹಳೆಯ ದಿನಾಂಕ: <span className="font-medium">{dataStats.oldestDate}</span>
-              </p>
-            )}
           </div>
         </div>
-        
-        {storageInfo.needsCleanup && (
-          <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
-            <p className="text-sm text-yellow-800">
-              ⚠️ ಸ್ಟೋರೇಜ್ {storageInfo.usagePercent}% ತುಂಬಿದೆ. ಹಳೆಯ ಪತ್ರಿಕೆಗಳನ್ನು ಅಳಿಸಿ.
-            </p>
-          </div>
-        )}
         
         <button
           onClick={refreshData}
@@ -501,13 +517,28 @@ const DataManagement = () => {
       {/* Danger Zone */}
       <div className="p-4 border border-red-200 rounded-lg bg-red-50">
         <h3 className="text-lg font-medium text-red-900 mb-2">ಅಪಾಯಕಾರಿ ಕ್ಷೇತ್ರ</h3>
-        <p className="text-sm text-red-700 mb-4">ಇದು ಎಲ್ಲಾ ಡೇಟಾವನ್ನು ಶಾಶ್ವತವಾಗಿ ಅಳಿಸುತ್ತದೆ. ಇದನ್ನು ವಾಪಸ್ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ.</p>
+        <p className="text-sm text-red-700 mb-4">ಇದು ಎಲ್ಲಾ ಪತ್ರಿಕೆಗಳನ್ನು ಶಾಶ್ವತವಾಗಿ ಅಳಿಸುತ್ತದೆ. ಇದನ್ನು ವಾಪಸ್ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ.</p>
         <button
-          onClick={handleClearAll}
+          onClick={async () => {
+            if (window.confirm('ಎಲ್ಲಾ ಪತ್ರಿಕೆಗಳನ್ನು ಅಳಿಸಲು ನಿಶ್ಚಿತವಾಗಿದ್ದೀರಾ?')) {
+              setIsLoading(true);
+              try {
+                for (const newspaper of newspapers) {
+                  await deleteNewspaper(newspaper.id);
+                }
+                alert('ಎಲ್ಲಾ ಪತ್ರಿಕೆಗಳನ್ನು ಅಳಿಸಲಾಗಿದೆ!');
+                await refreshData();
+              } catch (error) {
+                alert('ಪತ್ರಿಕೆಗಳನ್ನು ಅಳಿಸಲು ದೋಷ ಸಂಭವಿಸಿದೆ');
+              } finally {
+                setIsLoading(false);
+              }
+            }
+          }}
           disabled={isLoading}
           className="bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
         >
-          ಎಲ್ಲಾ ಡೇಟಾ ಅಳಿಸಿ
+          {isLoading ? 'ಅಳಿಸಲಾಗುತ್ತಿದೆ...' : 'ಎಲ್ಲಾ ಪತ್ರಿಕೆಗಳನ್ನು ಅಳಿಸಿ'}
         </button>
       </div>
     </div>

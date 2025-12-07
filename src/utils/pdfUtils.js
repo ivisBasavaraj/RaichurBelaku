@@ -7,14 +7,16 @@ try {
   console.error('PDF.js worker setup error:', error);
 }
 
+
+
 export const convertPDFToImage = async (pdfFile) => {
   try {
     const arrayBuffer = await pdfFile.arrayBuffer();
     const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
     const page = await pdf.getPage(1);
     
-    // Good quality scale
-    const scale = 1.5;
+    // High quality scale
+    const scale = 2.0;
     const viewport = page.getViewport({ scale });
     
     const canvas = document.createElement('canvas');
@@ -29,9 +31,9 @@ export const convertPDFToImage = async (pdfFile) => {
     
     await page.render(renderContext).promise;
     
-    // Good quality
+    // High quality
     return {
-      imageUrl: canvas.toDataURL('image/jpeg', 0.8),
+      imageUrl: canvas.toDataURL('image/jpeg', 0.95),
       width: viewport.width,
       height: viewport.height
     };
@@ -48,13 +50,12 @@ export const convertAllPDFPagesToImages = async (pdfFile) => {
     const numPages = pdf.numPages;
     const pages = [];
     
-    const maxPages = numPages;
-    
-    for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
+    // Process all pages
+    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
       const page = await pdf.getPage(pageNum);
       
-      // Good quality scale
-      const scale = 1.5;
+      // High quality scale
+      const scale = 2.0;
       
       const viewport = page.getViewport({ scale });
       
@@ -70,20 +71,18 @@ export const convertAllPDFPagesToImages = async (pdfFile) => {
       
       await page.render(renderContext).promise;
       
-      // Good quality
+      // High quality
       pages.push({
         pageNumber: pageNum,
-        imageUrl: canvas.toDataURL('image/jpeg', 0.8),
+        imageUrl: canvas.toDataURL('image/jpeg', 0.95),
         width: viewport.width,
         height: viewport.height
       });
     }
     
-
-    
     return {
       pages,
-      totalPages: maxPages,
+      totalPages: numPages,
       actualPages: numPages,
       previewImage: pages[0].imageUrl,
       width: pages[0].width,
@@ -106,6 +105,11 @@ export const savePDFFile = (file) => {
   });
 };
 
+// Compress image further if needed
+export const compressImage = (canvas, quality = 0.3) => {
+  return canvas.toDataURL('image/jpeg', quality);
+};
+
 // Utility to estimate storage size
 export const estimateStorageSize = (newspaper) => {
   try {
@@ -118,3 +122,4 @@ export const estimateStorageSize = (newspaper) => {
     return { bytes: 0, mb: '0.00' };
   }
 };
+

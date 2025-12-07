@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { convertAllPDFPagesToImages, savePDFFile, estimateStorageSize } from '../utils/pdfUtils';
-import { saveNewspaper, getStorageInfo } from '../utils/localStorage';
+import { saveNewspaper, getStorageStatus } from '../utils/hybridStorage';
+
 
 const AdminUploadPDF = ({ onUploadSuccess }) => {
   const [uploading, setUploading] = useState(false);
@@ -58,29 +59,31 @@ const AdminUploadPDF = ({ onUploadSuccess }) => {
     }
   };
 
-  const handleSaveNewspaper = () => {
+  const handleSaveNewspaper = async () => {
     if (uploadedNewspaper) {
+      setUploading(true);
       try {
-        localStorage.setItem('newspapers_v2', JSON.stringify([{
-          id: uploadedNewspaper.id,
-          name: uploadedNewspaper.name,
-          date: uploadedNewspaper.date,
-          pages: uploadedNewspaper.pages,
-          totalPages: uploadedNewspaper.totalPages,
-          previewImage: uploadedNewspaper.previewImage,
-          width: uploadedNewspaper.width,
-          height: uploadedNewspaper.height,
-          areas: []
-        }]));
+        const fileInput = document.getElementById('pdf-upload');
+        const pdfFile = fileInput?.files?.[0];
         
-        onUploadSuccess(uploadedNewspaper);
-        setUploadedNewspaper(null);
-        setCurrentPage(0);
-        setStorageWarning('');
-        alert('ಪತ್ರಿಕೆ ಯಶಸ್ವಿಯಾಗಿ ಉಳಿಸಲಾಗಿದೆ!');
+        const savedId = await saveNewspaper(uploadedNewspaper, pdfFile);
+        
+        if (savedId) {
+          onUploadSuccess({ ...uploadedNewspaper, id: savedId });
+          setUploadedNewspaper(null);
+          setCurrentPage(0);
+          setStorageWarning('');
+          
+          const storageStatus = await getStorageStatus();
+          alert(`ಪತ್ರಿಕೆ ಯಶಸ್ವಿಯಾಗಿ ಉಳಿಸಲಾಗಿದೆ! (${storageStatus.storageType})`);
+        } else {
+          throw new Error('Failed to save newspaper');
+        }
       } catch (error) {
         console.error('Save error:', error);
         alert('ಪತ್ರಿಕೆ ಉಳಿಸಲು ದೋಷ ಸಂಭವಿಸಿದೆ!');
+      } finally {
+        setUploading(false);
       }
     }
   };
@@ -211,9 +214,10 @@ const AdminUploadPDF = ({ onUploadSuccess }) => {
               </button>
               <button
                 onClick={handleSaveNewspaper}
-                className="bg-green-600 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-green-700 text-sm sm:text-base"
+                disabled={uploading}
+                className="bg-green-600 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
               >
-                ಉಳಿಸಿ
+                {uploading ? 'ಉಳಿಸಲಾಗುತ್ತಿದೆ...' : 'ಉಳಿಸಿ'}
               </button>
             </div>
             

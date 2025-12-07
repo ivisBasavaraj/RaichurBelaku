@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getNewspapers } from '../utils/localStorage';
+import { getNewspapers } from '../utils/hybridStorage';
 
 const Archive = () => {
   const [newspapers, setNewspapers] = useState([]);
@@ -9,10 +9,16 @@ const Archive = () => {
   const [sortBy, setSortBy] = useState('date-desc');
 
   useEffect(() => {
-    const loadNewspapers = () => {
-      const savedNewspapers = getNewspapers();
-      setNewspapers(savedNewspapers);
-      setFilteredNewspapers(savedNewspapers);
+    const loadNewspapers = async () => {
+      try {
+        const savedNewspapers = await getNewspapers();
+        setNewspapers(savedNewspapers);
+        setFilteredNewspapers(savedNewspapers);
+      } catch (error) {
+        console.error('Error loading newspapers:', error);
+        setNewspapers([]);
+        setFilteredNewspapers([]);
+      }
     };
     
     loadNewspapers();

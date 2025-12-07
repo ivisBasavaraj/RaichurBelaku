@@ -1,17 +1,29 @@
-import React, { useState, useEffect } from 'react';
-import { getClickableAreas } from '../utils/localStorage';
+import React, { useState, useEffect, useRef } from 'react';
+import { getClickableAreas } from '../utils/hybridStorage';
 
 const NewspaperViewer = ({ newspaper }) => {
   const [areas, setAreas] = useState([]);
   const [selectedNews, setSelectedNews] = useState(null);
   const [currentPage, setCurrentPage] = useState(0);
+  const [zoom, setZoom] = useState(1);
+  const [showThumbnails, setShowThumbnails] = useState(false);
+  const imageRef = useRef(null);
 
   useEffect(() => {
-    if (newspaper) {
-      const clickableAreas = newspaper.areas || getClickableAreas(newspaper.id) || [];
-      console.log('Loading areas for newspaper:', newspaper.id, 'Areas:', clickableAreas);
-      setAreas(clickableAreas);
-    }
+    const loadAreas = async () => {
+      if (newspaper) {
+        try {
+          const clickableAreas = newspaper.areas || await getClickableAreas(newspaper.id) || [];
+          console.log('Loading areas for newspaper:', newspaper.id, 'Areas:', clickableAreas);
+          setAreas(clickableAreas);
+        } catch (error) {
+          console.error('Error loading areas:', error);
+          setAreas([]);
+        }
+      }
+    };
+    
+    loadAreas();
   }, [newspaper]);
 
   const handleAreaClick = (area) => {
@@ -61,73 +73,155 @@ const NewspaperViewer = ({ newspaper }) => {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-      <div className="mb-3 sm:mb-4">
-        <h2 className="text-xl sm:text-2xl font-bold text-newspaper-blue mb-1 sm:mb-2">ಇಂದಿನ ಪತ್ರಿಕೆ</h2>
-        <p className="text-sm sm:text-base text-gray-600">{new Date(newspaper.date).toLocaleDateString('kn-IN')}</p>
-      </div>
-      
-      <div className="relative inline-block w-full">
-        <img
-          src={getCurrentPageImage()}
-          alt={`Newspaper page ${currentPage + 1}`}
-          className="newspaper-viewer-image w-full h-auto border border-gray-300 rounded-lg shadow-sm"
-        />
-        
-        {areas.filter(area => area.pageNumber === currentPage + 1).map(area => (
-          <div
-            key={area.id}
-            className="absolute cursor-pointer hover:bg-blue-200 hover:bg-opacity-30 transition-colors border-2 border-transparent hover:border-blue-400"
-            style={{
-              left: area.x,
-              top: area.y,
-              width: Math.abs(area.width),
-              height: Math.abs(area.height)
-            }}
-            onClick={() => handleAreaClick(area)}
-            title={area.title || 'ಸುದ್ದಿ ಓದಲು ಕ್ಲಿಕ್ ಮಾಡಿ'}
-          />
-        ))}
+    <div className="min-h-screen bg-gray-100">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 py-3">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-xl font-bold text-newspaper-blue">ರಾಯಚೂರು ಬೆಳಕು</h1>
+              <p className="text-sm text-gray-600">{new Date(newspaper.date).toLocaleDateString('kn-IN')}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowThumbnails(!showThumbnails)}
+                className="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded text-sm"
+              >
+                {showThumbnails ? 'ಮುಚ್ಚಿಸಿ' : 'ಪುಟಗಳು'}
+              </button>
+              <div className="flex items-center gap-1 bg-gray-200 rounded">
+                <button
+                  onClick={() => setZoom(Math.max(0.5, zoom - 0.25))}
+                  className="px-2 py-1 hover:bg-gray-300 rounded-l"
+                >-</button>
+                <span className="px-2 py-1 text-sm">{Math.round(zoom * 100)}%</span>
+                <button
+                  onClick={() => setZoom(Math.min(3, zoom + 0.25))}
+                  className="px-2 py-1 hover:bg-gray-300 rounded-r"
+                >+</button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Page Navigation */}
-      {newspaper.pages && newspaper.totalPages > 1 && (
-        <div className="mt-4 flex justify-between items-center">
-          <button
-            onClick={prevPage}
-            disabled={currentPage === 0}
-            className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            ← ಹಿಂದಿನ ಪುಟ
-          </button>
-          
-          <div className="text-sm text-gray-600">
-            ಪುಟ {currentPage + 1} / {newspaper.totalPages}
+      <div className="flex">
+        {/* Thumbnails Sidebar */}
+        {showThumbnails && newspaper.pages && (
+          <div className="w-64 bg-white shadow-lg h-screen overflow-y-auto">
+            <div className="p-4">
+              <h3 className="font-semibold mb-3">ಪುಟಗಳು</h3>
+              <div className="space-y-2">
+                {newspaper.pages.map((page, index) => (
+                  <div
+                    key={index}
+                    onClick={() => setCurrentPage(index)}
+                    className={`cursor-pointer border-2 rounded p-2 transition-colors ${
+                      currentPage === index ? 'border-newspaper-blue bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <img
+                      src={page.imageUrl}
+                      alt={`Page ${index + 1}`}
+                      className="w-full h-auto rounded"
+                    />
+                    <p className="text-xs text-center mt-1">ಪುಟ {index + 1}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-          
-          <button
-            onClick={nextPage}
-            disabled={currentPage === newspaper.totalPages - 1}
-            className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            ಮುಂದಿನ ಪುಟ →
-          </button>
+        )}
+
+        {/* Main Viewer */}
+        <div className="flex-1 overflow-auto">
+          <div className="p-4">
+            <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+              <div className="relative" style={{ transform: `scale(${zoom})`, transformOrigin: 'top left' }}>
+                <img
+                  ref={imageRef}
+                  src={getCurrentPageImage()}
+                  alt={`Newspaper page ${currentPage + 1}`}
+                  className="newspaper-viewer-image w-full h-auto"
+                />
+                
+                {areas.filter(area => area.pageNumber === currentPage + 1).map(area => (
+                  <div
+                    key={area.id}
+                    className="absolute cursor-pointer hover:bg-red-500 hover:bg-opacity-20 transition-colors border-2 border-transparent hover:border-red-500"
+                    style={{
+                      left: area.x,
+                      top: area.y,
+                      width: Math.abs(area.width),
+                      height: Math.abs(area.height)
+                    }}
+                    onClick={() => handleAreaClick(area)}
+                    title={area.title || 'ಸುದ್ದಿ ಓದಲು ಕ್ಲಿಕ್ ಮಾಡಿ'}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Navigation */}
+      {newspaper.pages && newspaper.totalPages > 1 && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white shadow-lg border-t">
+          <div className="max-w-7xl mx-auto px-4 py-3">
+            <div className="flex justify-between items-center">
+              <button
+                onClick={prevPage}
+                disabled={currentPage === 0}
+                className="bg-newspaper-blue text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                </svg>
+                ಹಿಂದಿನ ಪುಟ
+              </button>
+              
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-medium">ಪುಟ {currentPage + 1} / {newspaper.totalPages}</span>
+                <input
+                  type="range"
+                  min="0"
+                  max={newspaper.totalPages - 1}
+                  value={currentPage}
+                  onChange={(e) => setCurrentPage(parseInt(e.target.value))}
+                  className="w-32"
+                />
+              </div>
+              
+              <button
+                onClick={nextPage}
+                disabled={currentPage === newspaper.totalPages - 1}
+                className="bg-newspaper-blue text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                ಮುಂದಿನ ಪುಟ
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
       {/* News Modal */}
       {selectedNews && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-start mb-4">
-              <h3 className="text-xl font-bold text-newspaper-blue">{selectedNews.title || 'ಸುದ್ದಿ'}</h3>
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
+            <div className="flex justify-between items-center p-4 border-b bg-newspaper-blue text-white">
+              <h3 className="text-xl font-bold">{selectedNews.title || 'ಸುದ್ದಿ'}</h3>
               <button
                 onClick={closeNewsModal}
-                className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+                className="text-white hover:text-gray-200 text-2xl font-bold w-8 h-8 flex items-center justify-center rounded hover:bg-blue-700"
               >
                 ×
               </button>
             </div>
+            <div className="flex-1 overflow-y-auto p-6">
             
             {/* Show cropped image from the selected area */}
             <div className="mb-4">
@@ -153,10 +247,11 @@ const NewspaperViewer = ({ newspaper }) => {
               {selectedNews.content || 'ಈ ಸುದ್ದಿಗೆ ವಿಷಯ ಸೇರಿಸಲಾಗಿಲ್ಲ.'}
             </div>
             
-            <div className="mt-6 text-center">
+            </div>
+            <div className="p-4 border-t bg-gray-50 text-center">
               <button
                 onClick={closeNewsModal}
-                className="bg-newspaper-blue text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                className="bg-newspaper-red text-white px-8 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium"
               >
                 ಮುಚ್ಚಿಸಿ
               </button>
