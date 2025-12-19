@@ -56,14 +56,18 @@ const PDFMapper = ({ newspaper, onNavigateToManage, onAreasSaved }) => {
     if (Math.abs(currentArea.width) > 20 && Math.abs(currentArea.height) > 20) {
       const newArea = {
         id: Date.now().toString(),
-        ...currentArea,
-        title: `ಸುದ್ದಿ ${areas.length + 1}`,
+        x: Math.min(currentArea.x, currentArea.x + currentArea.width),
+        y: Math.min(currentArea.y, currentArea.y + currentArea.height),
+        width: Math.abs(currentArea.width),
+        height: Math.abs(currentArea.height),
+        title: `ಸುದ್ದಿ ${areas.filter(a => a.pageNumber === currentPage + 1).length + 1}`,
         content: 'ಈ ಪ್ರದೇಶದ ವಿವರಗಳು ಚಿತ್ರದಲ್ಲಿ ಲಭ್ಯವಿದೆ.',
         imageUrl: '',
         pageNumber: currentPage + 1
       };
+      
+      console.log('Adding new area:', newArea);
       setAreas(prev => [...prev, newArea]);
-      // Remove auto-save - let admin manually save
     }
     setCurrentArea(null);
     setIsDrawing(false);
@@ -79,16 +83,47 @@ const PDFMapper = ({ newspaper, onNavigateToManage, onAreasSaved }) => {
   };
 
   const handleSaveAll = async () => {
+    if (areas.length === 0) {
+      alert('ಉಳಿಸಲು ಪ್ರದೇಶಗಳಿಲ್ಲ. ಮುಂದೆ ಪ್ರದೇಶಗಳನ್ನು ಮ್ಯಾಪ್ ಮಾಡಿ.');
+      return;
+    }
+
     setIsSaving(true);
     console.log('Saving areas for newspaper:', newspaper.id, 'Areas count:', areas.length);
+    console.log('Areas data:', areas);
     
     try {
-      const success = await saveClickableAreas(newspaper.id, areas);
+      // Validate areas before saving
+      const validAreas = areas.filter(area => 
+        area.id && 
+        typeof area.x === 'number' && 
+        typeof area.y === 'number' && 
+        typeof area.width === 'number' && 
+        typeof area.height === 'number' &&
+        Math.abs(area.width) > 10 && 
+        Math.abs(area.height) > 10
+      );
+      
+      console.log('Valid areas count:', validAreas.length);
+      
+      if (validAreas.length === 0) {
+        alert('ಮಾನ್ಯವಾದ ಪ್ರದೇಶಗಳಿಲ್ಲ. ದಯವಿಟ್ಟು ಪುನಃ ಪ್ರಯತ್ನಿಸಿ.');
+        setIsSaving(false);
+        return;
+      }
+      
+      const success = await saveClickableAreas(newspaper.id, validAreas);
+      console.log('Save areas result:', success);
       
       if (success) {
-        alert('ಎಲ್ಲಾ ಪ್ರದೇಶಗಳನ್ನು ಯಶಸ್ವಿಯಾಗಿ ಉಳಿಸಲಾಗಿದೆ!');
+        alert(`${validAreas.length} ಪ್ರದೇಶಗಳನ್ನು ಯಶಸ್ವಿಯಾಗಿ ಉಳಿಸಲಾಗಿದೆ!`);
+        
+        // Update local state with saved areas
+        setAreas(validAreas);
+        
         // Call refresh callback
         if (onAreasSaved) {
+          console.log('Calling onAreasSaved callback');
           onAreasSaved();
         }
       } else {
@@ -96,7 +131,13 @@ const PDFMapper = ({ newspaper, onNavigateToManage, onAreasSaved }) => {
       }
     } catch (error) {
       console.error('Error saving areas:', error);
-      alert('ಪ್ರದೇಶಗಳನ್ನು ಉಳಿಸಲು ದೋಷ ಸಂಭವಿಸಿದೆ!');
+      let errorMessage = 'ಪ್ರದೇಶಗಳನ್ನು ಉಳಿಸಲು ದೋಷ ಸಂಭವಿಸಿದೆ!';
+      
+      if (error.message?.includes('network')) {
+        errorMessage += '\nನೆಟ್ವರ್ಕ್ ಸಮಸ್ಯೆ. ಇಂಟರ್ನೆಟ್ ಸಂಪರ್ಕ ಪರಿಶೀಲಿಸಿ.';
+      }
+      
+      alert(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -188,29 +229,37 @@ const PDFMapper = ({ newspaper, onNavigateToManage, onAreasSaved }) => {
 
       <div className="mt-3 sm:mt-4">
         {/* Save and Publish Workflow */}
-        {areas.length > 0 && (
-          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <h3 className="text-lg font-medium text-blue-900 mb-3">ಪ್ರದೇಶ ಮ್ಯಾಪಿಂಗ್ ಪೂರ್ಣಗೋಂಡಿದೆ</h3>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                onClick={handleSaveAll}
-                disabled={isSaving}
-                className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
-              >
-                {isSaving ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                    ಉಳಿಸಲಾಗುತ್ತಿದೆ...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                    </svg>
-                    ಪ್ರದೇಶಗಳನ್ನು ಉಳಿಸಿ ({areas.length})
-                  </>
-                )}
-              </button>
+        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <h3 className="text-lg font-medium text-blue-900 mb-3">ಪ್ರದೇಶ ಮ್ಯಾಪಿಂಗ್ ನಿಯಂತ್ರಣ</h3>
+          
+          <div className="mb-3">
+            <div className="text-sm text-blue-800">
+              ಒಟ್ಟು ಪ್ರದೇಶಗಳು: {areas.length} | ಈ ಪುಟದಲ್ಲಿ: {areas.filter(area => area.pageNumber === currentPage + 1).length}
+            </div>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={handleSaveAll}
+              disabled={isSaving || areas.length === 0}
+              className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
+            >
+              {isSaving ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                  ಉಳಿಸಲಾಗುತ್ತಿದೆ...
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                  ಪ್ರದೇಶಗಳನ್ನು ಉಳಿಸಿ ({areas.length})
+                </>
+              )}
+            </button>
+            
+            {areas.length > 0 && (
               <button
                 onClick={() => onNavigateToManage && onNavigateToManage()}
                 className="bg-newspaper-blue text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center gap-2"
@@ -220,12 +269,16 @@ const PDFMapper = ({ newspaper, onNavigateToManage, onAreasSaved }) => {
                 </svg>
                 ಪ್ರಕಟಿಸಲು ಹೋಗಿ
               </button>
-            </div>
-            <p className="text-sm text-blue-700 mt-2">
-              ಮುಂದೆ ಪ್ರದೇಶಗಳನ್ನು ಉಳಿಸಿ, ಅನಂತರ ಪ್ರಕಟಿಸಲು ಹೋಗಿ
-            </p>
+            )}
           </div>
-        )}
+          
+          <p className="text-sm text-blue-700 mt-2">
+            {areas.length === 0 
+              ? 'ಮುಂದೆ ಪ್ರದೇಶಗಳನ್ನು ಮ್ಯಾಪ್ ಮಾಡಿ, ಅನಂತರ ಉಳಿಸಿ'
+              : 'ಮುಂದೆ ಪ್ರದೇಶಗಳನ್ನು ಉಳಿಸಿ, ಅನಂತರ ಪ್ರಕಟಿಸಲು ಹೋಗಿ'
+            }
+          </p>
+        </div>
         
         <div className="mb-3 sm:mb-4 flex flex-col sm:flex-row gap-2">
           <div className="text-xs sm:text-sm text-gray-600 flex items-center">

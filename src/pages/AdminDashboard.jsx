@@ -11,6 +11,16 @@ import {
   deleteNewspaper, 
   getStorageStatus 
 } from '../utils/hybridStorage';
+import { 
+  testLocalStorage, 
+  forceSaveTest 
+} from '../utils/localStorageTest';
+import { 
+  createBackup, 
+  restoreFromBackup, 
+  clearAllData,
+  getDataStats 
+} from '../utils/localStorage';
 
 const AdminDashboard = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -455,13 +465,13 @@ const DataManagement = () => {
               }
             }
           }}
-          disabled={isLoading || dataStats.newspaperCount <= 10}
+          disabled={isLoading || newspapers.length <= 10}
           className="bg-orange-600 text-white py-2 px-4 rounded-lg hover:bg-orange-700 disabled:opacity-50 transition-colors mr-3"
         >
           ಹಳೆಯ ಪತ್ರಿಕೆಗಳನ್ನು ಅಳಿಸಿ
         </button>
         <span className="text-sm text-gray-600">
-          ({Math.max(0, dataStats.newspaperCount - 10)} ಅಳಿಸಬಹುದು)
+          ({Math.max(0, newspapers.length - 10)} ಅಳಿಸಬಹುದು)
         </span>
       </div>
 
@@ -491,7 +501,10 @@ const DataManagement = () => {
           </button>
           <button
             onClick={() => {
-              diagnoseLocalStorage();
+              console.log('=== localStorage Diagnosis ===');
+              console.log('Available:', typeof Storage !== 'undefined' && window.localStorage);
+              console.log('Keys:', Object.keys(localStorage));
+              console.log('App keys:', Object.keys(localStorage).filter(k => k.includes('newspapers') || k.includes('today')));
               alert('ಡಾಯಗ್ನೋಸಿಸ್ ಪೂರ್ಣ! ಕನ್ಸೋಲ್ ಪರೀಕ್ಷಿಸಿ.');
             }}
             className="bg-orange-600 text-white py-2 px-3 rounded-lg hover:bg-orange-700 transition-colors text-sm"
@@ -501,7 +514,7 @@ const DataManagement = () => {
           <button
             onClick={() => {
               if (window.confirm('ಎಲ್ಲಾ ಡೇಟಾ ಅಳಿಸಿ localStorage ರೀಸೆಟ್ ಮಾಡಲು ನಿಶ್ಚಿತವಾಗಿದ್ದೀರಾ?')) {
-                const result = emergencyReset();
+                const result = clearAllData();
                 alert(result ? 'ರೀಸೆಟ್ ಯಶಸ್ವಿ!' : 'ರೀಸೆಟ್ ಫೇಲ್!');
                 refreshData();
                 window.location.reload();

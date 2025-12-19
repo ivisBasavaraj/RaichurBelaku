@@ -52,34 +52,56 @@ export const saveNewspaper = async (newspaper, pdfFile = null) => {
   try {
     console.log('Saving newspaper to Supabase:', newspaper.name);
     
+    if (!newspaper || !newspaper.id) {
+      throw new Error('Invalid newspaper data - missing ID');
+    }
+    
     let processedNewspaper = { ...newspaper };
     
     // Upload PDF if provided
     if (pdfFile) {
       try {
+        console.log('Uploading PDF file:', pdfFile.name);
         const pdfURL = await uploadPDFToStorage(pdfFile, newspaper.id);
         processedNewspaper.pdfUrl = pdfURL;
+        console.log('PDF uploaded successfully:', pdfURL);
       } catch (error) {
         console.error('PDF upload failed:', error);
+        // Continue without PDF URL - use data URL as fallback
       }
     }
     
     // Process and upload images
-    if (newspaper.pages) {
-      processedNewspaper.pages = await processImagesForStorage(newspaper.pages, newspaper.id);
+    if (newspaper.pages && newspaper.pages.length > 0) {
+      try {
+        console.log('Processing images for storage:', newspaper.pages.length, 'pages');
+        processedNewspaper.pages = await processImagesForStorage(newspaper.pages, newspaper.id);
+        console.log('Images processed successfully');
+      } catch (error) {
+        console.error('Image processing failed:', error);
+        // Keep original pages as fallback
+        processedNewspaper.pages = newspaper.pages;
+      }
     }
     
     // Keep PDF URL for access
-    if (processedNewspaper.pdfData) {
+    if (processedNewspaper.pdfData && !processedNewspaper.pdfUrl) {
       processedNewspaper.pdfUrl = processedNewspaper.pdfData;
+    }
+    
+    // Remove pdfData to save space
+    if (processedNewspaper.pdfData) {
       delete processedNewspaper.pdfData;
     }
     
+    console.log('Saving processed newspaper to Supabase...');
     const id = await saveNewspaperToSupabase(processedNewspaper);
+    console.log('Newspaper saved with ID:', id);
+    
     return id;
   } catch (error) {
     console.error('Error saving to Supabase:', error);
-    throw error;
+    throw new Error(`Failed to save newspaper: ${error.message}`);
   }
 };
 
@@ -164,7 +186,28 @@ export const getClickableAreas = async (newspaperId) => {
 // Publish newspaper as today's edition
 export const publishToday = async (newspaperId) => {
   try {
-    return await setTodaysNewspaper(newspaperId);
+    console.log('Publishing newspaper as today\'s edition:', newspaperId);
+    
+    if (!newspaperId) {
+      throw new Error('No newspaper ID provided');
+    }
+    
+    // Verify newspaper exists first
+    const newspaper = await getNewspaperById(newspaperId);
+    if (!newspaper) {
+      throw new Error('Newspaper not found');
+    }
+    
+    console.log('Found newspaper to publish:', newspaper.name);
+    const result = await setTodaysNewspaper(newspaperId);
+    
+    if (result) {
+      console.log('Successfully published newspaper as today\'s edition');
+    } else {
+      console.error('Failed to publish newspaper');
+    }
+    
+    return result;
   } catch (error) {
     console.error('Error publishing newspaper:', error);
     return false;

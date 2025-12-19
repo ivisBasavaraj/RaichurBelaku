@@ -16,14 +16,29 @@ const AdminUploadPDF = ({ onUploadSuccess }) => {
       return;
     }
     
-
+    // Check file size (limit to 50MB)
+    if (file.size > 50 * 1024 * 1024) {
+      alert('PDF ಫೈಲ್ ತುಂಬಾ ದೊಡ್ಡದಾಗಿದೆ. ದಯವಿಟ್ಟು 50MB ಕ್ಕಿಂತ ಚಿಕ್ಕ ಫೈಲ್ ಆಯ್ಕೆ ಮಾಡಿ.');
+      return;
+    }
 
     setUploading(true);
+    setStorageWarning('');
+    
     try {
+      console.log('Starting PDF upload process for:', file.name);
+      
       const [pagesData, pdfData] = await Promise.all([
         convertAllPDFPagesToImages(file),
         savePDFFile(file)
       ]);
+
+      console.log('PDF processing completed:', {
+        totalPages: pagesData.totalPages,
+        actualPages: pagesData.actualPages,
+        width: pagesData.width,
+        height: pagesData.height
+      });
 
       const newspaper = {
         id: Date.now().toString(),
@@ -43,6 +58,10 @@ const AdminUploadPDF = ({ onUploadSuccess }) => {
       const sizeEstimate = estimateStorageSize(newspaper);
       console.log(`Newspaper size estimate: ${sizeEstimate.mb} MB`);
       
+      if (parseFloat(sizeEstimate.mb) > 10) {
+        setStorageWarning('ಎಚ್ಚರಿಕೆ: ಫೈಲ್ ಗಾತ್ರ ದೊಡ್ಡದಾಗಿದೆ. ಸ್ಟೋರೇಜ್ ಸಮಸ್ಯೆಗಳು ಸಂಭವಿಸಬಹುದು.');
+      }
+      
       setUploadedNewspaper(newspaper);
       setCurrentPage(0);
       
@@ -53,38 +72,75 @@ const AdminUploadPDF = ({ onUploadSuccess }) => {
       alert(message);
     } catch (error) {
       console.error('Upload error:', error);
-      alert('PDF ಅಪ್ಲೋಡ್ ಮಾಡುವಲ್ಲಿ ದೋಷ ಸಂಭವಿಸಿದೆ');
+      let errorMessage = 'PDF ಅಪ್ಲೋಡ್ ಮಾಡುವಲ್ಲಿ ದೋಷ ಸಂಭವಿಸಿದೆ';
+      
+      if (error.message?.includes('PDF.js')) {
+        errorMessage += '\nPDF ಫೈಲ್ ದೋಷಪೂರಿತವಾಗಿರಬಹುದು. ಬೇರೆ ಫೈಲ್ ಪ್ರಯತ್ನಿಸಿ.';
+      } else if (error.message?.includes('storage')) {
+        errorMessage += '\nಸ್ಟೋರೇಜ್ ಸಮಸ್ಯೆ. ಬ್ರೌಸರ್ ಸ್ಟೋರೇಜ್ ಪರಿಶೀಲಿಸಿ.';
+      }
+      
+      alert(errorMessage);
     } finally {
       setUploading(false);
     }
   };
 
   const handleSaveNewspaper = async () => {
-    if (uploadedNewspaper) {
-      setUploading(true);
-      try {
-        const fileInput = document.getElementById('pdf-upload');
-        const pdfFile = fileInput?.files?.[0];
-        
-        const savedId = await saveNewspaper(uploadedNewspaper, pdfFile);
-        
-        if (savedId) {
-          onUploadSuccess({ ...uploadedNewspaper, id: savedId });
-          setUploadedNewspaper(null);
-          setCurrentPage(0);
-          setStorageWarning('');
-          
-          const storageStatus = await getStorageStatus();
-          alert(`ಪತ್ರಿಕೆ ಯಶಸ್ವಿಯಾಗಿ ಉಳಿಸಲಾಗಿದೆ! (${storageStatus.storageType})`);
-        } else {
-          throw new Error('Failed to save newspaper');
-        }
-      } catch (error) {
-        console.error('Save error:', error);
-        alert('ಪತ್ರಿಕೆ ಉಳಿಸಲು ದೋಷ ಸಂಭವಿಸಿದೆ!');
-      } finally {
-        setUploading(false);
+    if (!uploadedNewspaper) {
+      alert('ಉಳಿಸಲು ಪತ್ರಿಕೆ ಇಲ್ಲ!');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      console.log('Saving newspaper:', uploadedNewspaper.name, 'ID:', uploadedNewspaper.id);
+      
+      const fileInput = document.getElementById('pdf-upload');
+      const pdfFile = fileInput?.files?.[0];
+      
+      if (!pdfFile) {
+        console.warn('No PDF file found in input');
       }
+      
+      const savedId = await saveNewspaper(uploadedNewspaper, pdfFile);
+      console.log('Save result ID:', savedId);
+      
+      if (savedId) {
+        const savedNewspaper = { ...uploadedNewspaper, id: savedId };
+        console.log('Calling onUploadSuccess with:', savedNewspaper);
+        
+        // Clear form first
+        setUploadedNewspaper(null);
+        setCurrentPage(0);
+        setStorageWarning('');
+        
+        // Reset file input
+        if (fileInput) {
+          fileInput.value = '';
+        }
+        
+        // Call success callback
+        onUploadSuccess(savedNewspaper);
+        
+        const storageStatus = await getStorageStatus();
+        alert(`ಪತ್ರಿಕೆ ಯಶಸ್ವಿಯಾಗಿ ಉಳಿಸಲಾಗಿದೆ! (${storageStatus.storageType})`);
+      } else {
+        throw new Error('Failed to save newspaper - no ID returned');
+      }
+    } catch (error) {
+      console.error('Save error:', error);
+      let errorMessage = 'ಪತ್ರಿಕೆ ಉಳಿಸಲು ದೋಷ ಸಂಭವಿಸಿದೆ!';
+      
+      if (error.message?.includes('storage')) {
+        errorMessage += '\nಸ್ಟೋರೇಜ್ ಸಮಸ್ಯೆ. ಬ್ರೌಸರ್ ಸ್ಟೋರೇಜ್ ಪರಿಶೀಲಿಸಿ.';
+      } else if (error.message?.includes('network')) {
+        errorMessage += '\nನೆಟ್ವರ್ಕ್ ಸಮಸ್ಯೆ. ಇಂಟರ್ನೆಟ್ ಸಂಪರ್ಕ ಪರಿಶೀಲಿಸಿ.';
+      }
+      
+      alert(errorMessage);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -181,6 +237,12 @@ const AdminUploadPDF = ({ onUploadSuccess }) => {
             <div className="text-xs text-gray-500">
               ಅನುಮಾನಿತ ಗಾತ್ರ: {estimateStorageSize(uploadedNewspaper).mb} MB
             </div>
+            
+            {storageWarning && (
+              <div className="text-xs text-orange-600 mt-1">
+                {storageWarning}
+              </div>
+            )}
           </div>
           
           <div className="border rounded-lg p-2 sm:p-4 mb-3 sm:mb-4">
