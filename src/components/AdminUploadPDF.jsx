@@ -1,14 +1,10 @@
 import React, { useState } from 'react';
-import { convertAllPDFPagesToImages, savePDFFile, estimateStorageSize } from '../utils/pdfUtils';
+import { convertAllPDFPagesToImages, savePDFFile } from '../utils/pdfUtils';
 import { saveNewspaper, getStorageStatus } from '../utils/hybridStorage';
-
 
 const AdminUploadPDF = ({ onUploadSuccess }) => {
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const [uploadedNewspaper, setUploadedNewspaper] = useState(null);
-  const [currentPage, setCurrentPage] = useState(0);
-  const [storageWarning, setStorageWarning] = useState('');
 
   const handleFileUpload = async (file) => {
     if (!file || file.type !== 'application/pdf') {
@@ -16,29 +12,20 @@ const AdminUploadPDF = ({ onUploadSuccess }) => {
       return;
     }
     
-    // Check file size (limit to 50MB)
     if (file.size > 50 * 1024 * 1024) {
       alert('PDF ಫೈಲ್ ತುಂಬಾ ದೊಡ್ಡದಾಗಿದೆ. ದಯವಿಟ್ಟು 50MB ಕ್ಕಿಂತ ಚಿಕ್ಕ ಫೈಲ್ ಆಯ್ಕೆ ಮಾಡಿ.');
       return;
     }
 
     setUploading(true);
-    setStorageWarning('');
     
     try {
-      console.log('Starting PDF upload process for:', file.name);
+      console.log('Processing and saving PDF:', file.name);
       
       const [pagesData, pdfData] = await Promise.all([
         convertAllPDFPagesToImages(file),
         savePDFFile(file)
       ]);
-
-      console.log('PDF processing completed:', {
-        totalPages: pagesData.totalPages,
-        actualPages: pagesData.actualPages,
-        width: pagesData.width,
-        height: pagesData.height
-      });
 
       const newspaper = {
         id: Date.now().toString(),
@@ -51,108 +38,26 @@ const AdminUploadPDF = ({ onUploadSuccess }) => {
         previewImage: pagesData.previewImage,
         width: pagesData.width,
         height: pagesData.height,
-        areas: [] // Initialize empty areas array
+        areas: []
       };
-
-      // Show size estimate
-      const sizeEstimate = estimateStorageSize(newspaper);
-      console.log(`Newspaper size estimate: ${sizeEstimate.mb} MB`);
       
-      if (parseFloat(sizeEstimate.mb) > 10) {
-        setStorageWarning('ಎಚ್ಚರಿಕೆ: ಫೈಲ್ ಗಾತ್ರ ದೊಡ್ಡದಾಗಿದೆ. ಸ್ಟೋರೇಜ್ ಸಮಸ್ಯೆಗಳು ಸಂಭವಿಸಬಹುದು.');
-      }
+      // Auto-save immediately
+      const savedId = await saveNewspaper(newspaper, file);
+      const savedNewspaper = { ...newspaper, id: savedId };
       
-      setUploadedNewspaper(newspaper);
-      setCurrentPage(0);
+      // Reset form
+      const fileInput = document.getElementById('pdf-upload');
+      if (fileInput) fileInput.value = '';
       
-      let message = 'PDF ಯಶಸ್ವಿಯಾಗಿ ಅಪ್ಲೋಡ್ ಆಗಿದೆ!';
-      if (pagesData.actualPages > pagesData.totalPages) {
-        message += `\nಗಮನಿಸಿ: ${pagesData.actualPages} ಪುಟಗಳಿಂದ ${pagesData.totalPages} ಪುಟಗಳನ್ನು ಮಾತ್ರ ಪ್ರಕ್ರಿಯೆಗೊಳಿಸಲಾಗಿದೆ.`;
-      }
-      alert(message);
+      onUploadSuccess(savedNewspaper);
+      
+      const storageStatus = await getStorageStatus();
+      alert(`ಪತ್ರಿಕೆ ಯಶಸ್ವಿಯಾಗಿ ಅಪ್ಲೋಡ್ ಆಗಿದೆ! (${storageStatus.storageType})`);
     } catch (error) {
       console.error('Upload error:', error);
-      let errorMessage = 'PDF ಅಪ್ಲೋಡ್ ಮಾಡುವಲ್ಲಿ ದೋಷ ಸಂಭವಿಸಿದೆ';
-      
-      if (error.message?.includes('PDF.js')) {
-        errorMessage += '\nPDF ಫೈಲ್ ದೋಷಪೂರಿತವಾಗಿರಬಹುದು. ಬೇರೆ ಫೈಲ್ ಪ್ರಯತ್ನಿಸಿ.';
-      } else if (error.message?.includes('storage')) {
-        errorMessage += '\nಸ್ಟೋರೇಜ್ ಸಮಸ್ಯೆ. ಬ್ರೌಸರ್ ಸ್ಟೋರೇಜ್ ಪರಿಶೀಲಿಸಿ.';
-      }
-      
-      alert(errorMessage);
+      alert('PDF ಅಪ್ಲೋಡ್ ಮಾಡುವಲ್ಲಿ ದೋಷ ಸಂಭವಿಸಿದೆ');
     } finally {
       setUploading(false);
-    }
-  };
-
-  const handleSaveNewspaper = async () => {
-    if (!uploadedNewspaper) {
-      alert('ಉಳಿಸಲು ಪತ್ರಿಕೆ ಇಲ್ಲ!');
-      return;
-    }
-
-    setUploading(true);
-    try {
-      console.log('Saving newspaper:', uploadedNewspaper.name, 'ID:', uploadedNewspaper.id);
-      
-      const fileInput = document.getElementById('pdf-upload');
-      const pdfFile = fileInput?.files?.[0];
-      
-      if (!pdfFile) {
-        console.warn('No PDF file found in input');
-      }
-      
-      const savedId = await saveNewspaper(uploadedNewspaper, pdfFile);
-      console.log('Save result ID:', savedId);
-      
-      if (savedId) {
-        const savedNewspaper = { ...uploadedNewspaper, id: savedId };
-        console.log('Calling onUploadSuccess with:', savedNewspaper);
-        
-        // Clear form first
-        setUploadedNewspaper(null);
-        setCurrentPage(0);
-        setStorageWarning('');
-        
-        // Reset file input
-        if (fileInput) {
-          fileInput.value = '';
-        }
-        
-        // Call success callback
-        onUploadSuccess(savedNewspaper);
-        
-        const storageStatus = await getStorageStatus();
-        alert(`ಪತ್ರಿಕೆ ಯಶಸ್ವಿಯಾಗಿ ಉಳಿಸಲಾಗಿದೆ! (${storageStatus.storageType})`);
-      } else {
-        throw new Error('Failed to save newspaper - no ID returned');
-      }
-    } catch (error) {
-      console.error('Save error:', error);
-      let errorMessage = 'ಪತ್ರಿಕೆ ಉಳಿಸಲು ದೋಷ ಸಂಭವಿಸಿದೆ!';
-      
-      if (error.message?.includes('storage')) {
-        errorMessage += '\nಸ್ಟೋರೇಜ್ ಸಮಸ್ಯೆ. ಬ್ರೌಸರ್ ಸ್ಟೋರೇಜ್ ಪರಿಶೀಲಿಸಿ.';
-      } else if (error.message?.includes('network')) {
-        errorMessage += '\nನೆಟ್ವರ್ಕ್ ಸಮಸ್ಯೆ. ಇಂಟರ್ನೆಟ್ ಸಂಪರ್ಕ ಪರಿಶೀಲಿಸಿ.';
-      }
-      
-      alert(errorMessage);
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const nextPage = () => {
-    if (currentPage < uploadedNewspaper.totalPages - 1) {
-      setCurrentPage(currentPage + 1);
-    }
-  };
-
-  const prevPage = () => {
-    if (currentPage > 0) {
-      setCurrentPage(currentPage - 1);
     }
   };
 
@@ -176,123 +81,46 @@ const AdminUploadPDF = ({ onUploadSuccess }) => {
     <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
       <h2 className="text-lg sm:text-xl font-semibold text-newspaper-blue mb-3 sm:mb-4">PDF ಅಪ್ಲೋಡ್ ಮಾಡಿ</h2>
       
-      {!uploadedNewspaper ? (
-        <div
-          className={`border-2 border-dashed rounded-lg p-4 sm:p-8 text-center transition-colors cursor-pointer ${
-            dragOver 
-              ? 'border-newspaper-blue bg-blue-50' 
-              : 'border-gray-300 hover:border-newspaper-blue active:border-newspaper-blue'
-          }`}
-          onDrop={handleDrop}
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-          onDragLeave={() => setDragOver(false)}
-          onClick={handleDivClick}
-          onTouchStart={() => setDragOver(true)}
-          onTouchEnd={() => setDragOver(false)}
-        >
-          {uploading ? (
-            <div className="flex flex-col items-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-newspaper-blue mb-4"></div>
-              <p className="text-gray-600">PDF ಪ್ರಕ್ರಿಯೆಗೊಳಿಸಲಾಗುತ್ತಿದೆ...</p>
-            </div>
-          ) : (
-            <div>
-              <div className="mb-4">
-                <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                  <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-              <p className="text-base sm:text-lg text-gray-600 mb-2">PDF ಫೈಲ್ ಅನ್ನು ಇಲ್ಲಿ ಟ್ಯಾಪ್ ಮಾಡಿ</p>
-              <p className="text-sm text-gray-500 mb-4">ಅಥವಾ ಕೆಳಗಿನ ಬಟನ್ ಒತ್ತಿ</p>
-              <input
-                type="file"
-                accept="application/pdf,.pdf"
-                onChange={handleFileSelect}
-                className="hidden"
-                id="pdf-upload"
-              />
-              <div className="bg-newspaper-blue text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg cursor-pointer hover:bg-blue-700 active:bg-blue-800 transition-colors inline-block text-sm sm:text-base">
-                ಫೈಲ್ ಆಯ್ಕೆ ಮಾಡಿ
-              </div>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div>
-          <div className="mb-3 sm:mb-4">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-2">
-              <h3 className="text-base sm:text-lg font-medium text-gray-900 truncate">{uploadedNewspaper.name}</h3>
-              <div className="text-xs sm:text-sm text-gray-600">
-                ಪುಟ {currentPage + 1} / {uploadedNewspaper.totalPages}
-                {uploadedNewspaper.actualPages > uploadedNewspaper.totalPages && (
-                  <span className="text-orange-600 ml-2">
-                    (ಒಟ್ಟು: {uploadedNewspaper.actualPages})
-                  </span>
-                )}
-              </div>
-            </div>
-            
-
-            
-            <div className="text-xs text-gray-500">
-              ಅನುಮಾನಿತ ಗಾತ್ರ: {estimateStorageSize(uploadedNewspaper).mb} MB
-            </div>
-            
-            {storageWarning && (
-              <div className="text-xs text-orange-600 mt-1">
-                {storageWarning}
-              </div>
-            )}
+      <div
+        className={`border-2 border-dashed rounded-lg p-4 sm:p-8 text-center transition-colors cursor-pointer ${
+          dragOver 
+            ? 'border-newspaper-blue bg-blue-50' 
+            : 'border-gray-300 hover:border-newspaper-blue active:border-newspaper-blue'
+        }`}
+        onDrop={handleDrop}
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onClick={handleDivClick}
+        onTouchStart={() => setDragOver(true)}
+        onTouchEnd={() => setDragOver(false)}
+      >
+        {uploading ? (
+          <div className="flex flex-col items-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-newspaper-blue mb-4"></div>
+            <p className="text-gray-600">PDF ಪ್ರಕ್ರಿಯೆಗೊಳಿಸಲಾಗುತ್ತಿದೆ...</p>
           </div>
-          
-          <div className="border rounded-lg p-2 sm:p-4 mb-3 sm:mb-4">
-            <img
-              src={uploadedNewspaper.pages[currentPage].imageUrl}
-              alt={`Page ${currentPage + 1}`}
-              className="w-full h-auto mx-auto"
-              style={{ maxHeight: '400px' }}
+        ) : (
+          <div>
+            <div className="mb-4">
+              <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <p className="text-base sm:text-lg text-gray-600 mb-2">PDF ಫೈಲ್ ಅನ್ನು ಇಲ್ಲಿ ಟ್ಯಾಪ್ ಮಾಡಿ</p>
+            <p className="text-sm text-gray-500 mb-4">ಅಥವಾ ಕೆಳಗಿನ ಬಟನ್ ಒತ್ತಿ</p>
+            <input
+              type="file"
+              accept="application/pdf,.pdf"
+              onChange={handleFileSelect}
+              className="hidden"
+              id="pdf-upload"
             />
-          </div>
-          
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
-            <button
-              onClick={prevPage}
-              disabled={currentPage === 0}
-              className="w-full sm:w-auto bg-gray-500 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
-            >
-              ← ಹಿಂದಿನ ಪುಟ
-            </button>
-            
-            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-              <button
-                onClick={() => {
-                  setUploadedNewspaper(null);
-                  setCurrentPage(0);
-                  setStorageWarning('');
-                }}
-                className="bg-gray-500 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-600 text-sm sm:text-base"
-              >
-                ರದ್ದುಮಾಡಿ
-              </button>
-              <button
-                onClick={handleSaveNewspaper}
-                disabled={uploading}
-                className="bg-green-600 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
-              >
-                {uploading ? 'ಉಳಿಸಲಾಗುತ್ತಿದೆ...' : 'ಉಳಿಸಿ'}
-              </button>
+            <div className="bg-newspaper-blue text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg cursor-pointer hover:bg-blue-700 active:bg-blue-800 transition-colors inline-block text-sm sm:text-base">
+              ಫೈಲ್ ಆಯ್ಕೆ ಮಾಡಿ
             </div>
-            
-            <button
-              onClick={nextPage}
-              disabled={currentPage === uploadedNewspaper.totalPages - 1}
-              className="w-full sm:w-auto bg-gray-500 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
-            >
-              ಮುಂದಿನ ಪುಟ →
-            </button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

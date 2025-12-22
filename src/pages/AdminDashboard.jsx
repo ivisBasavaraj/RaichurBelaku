@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import AdminUploadPDF from '../components/AdminUploadPDF';
 import PDFMapper from '../components/PDFMapper';
 import AdminLogin from '../components/AdminLogin';
-import LocalStorageStatus from '../components/LocalStorageStatus';
-import FirebaseSetup from '../components/FirebaseSetup';
 import { 
   getNewspapers, 
   publishToday, 
@@ -11,16 +9,6 @@ import {
   deleteNewspaper, 
   getStorageStatus 
 } from '../utils/hybridStorage';
-import { 
-  testLocalStorage, 
-  forceSaveTest 
-} from '../utils/localStorageTest';
-import { 
-  createBackup, 
-  restoreFromBackup, 
-  clearAllData,
-  getDataStats 
-} from '../utils/localStorage';
 
 const AdminDashboard = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -62,7 +50,9 @@ const AdminDashboard = () => {
       console.error('Error refreshing newspapers:', error);
     }
     
+    // Go directly to area mapping - the main feature
     setActiveTab('mapper');
+    alert('ಈಗ ಪತ್ರಿಕೆಯ ಮೇಲೆ ಕ್ಲಿಕ್ ಮಾಡಬಹುದಾದ ಪ್ರದೇಶಗಳನ್ನು ಸೇರಿಸಿ!');
   };
 
   const handleNewspaperSelect = (newspaper) => {
@@ -103,9 +93,7 @@ const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <LocalStorageStatus />
       <div className="max-w-7xl mx-auto px-4 py-6 sm:py-8">
-        <FirebaseSetup />
         <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-newspaper-blue mb-1 sm:mb-2">ಆಡಳಿತ ಡ್ಯಾಶ್ಬೋರ್ಡ್</h1>
@@ -182,6 +170,7 @@ const AdminDashboard = () => {
                     setActiveTab('manage');
                   }}
                   onAreasSaved={loadNewspapers} // Refresh when areas are saved
+                  onPublishToday={handlePublishToday} // Add publish function
                 />
               ) : (
                 <div className="bg-white rounded-lg shadow-md p-8 text-center">

@@ -1,213 +1,160 @@
-import {
-  saveNewspaperToSupabase,
-  getNewspapersFromSupabase,
-  getNewspaperFromSupabase,
-  deleteNewspaperFromSupabase,
-  updateNewspaperAreas,
-  getTodaysNewspaperFromSupabase,
-  setTodaysNewspaperInSupabase,
-  uploadPDFToStorage,
-  uploadImageToStorage
-} from './supabaseStorage';
+import { db } from './firebase.js';
+import { 
+  collection, 
+  doc, 
+  getDocs, 
+  getDoc, 
+  setDoc, 
+  deleteDoc, 
+  updateDoc,
+  query,
+  orderBy 
+} from 'firebase/firestore';
 
+// Collections
+const NEWSPAPERS_COLLECTION = 'newspapers';
+const SETTINGS_COLLECTION = 'settings';
+const TODAY_DOC = 'todaysNewspaper';
 
-
-
-
-// Import supabase client
-import { supabase } from './firebase';
-
-
-
-
-
-// Process images for storage
-const processImagesForStorage = async (pages, newspaperId) => {
-  const processedPages = [];
-  for (let i = 0; i < pages.length; i++) {
-    const page = pages[i];
-    try {
-      // Convert data URL to blob
-      const response = await fetch(page.imageUrl);
-      const blob = await response.blob();
-      
-      // Upload to Supabase Storage
-      const downloadURL = await uploadImageToStorage(blob, newspaperId, page.pageNumber);
-      
-      processedPages.push({
-        ...page,
-        imageUrl: downloadURL
-      });
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      // Fallback to original data URL
-      processedPages.push(page);
-    }
-  }
-  return processedPages;
-};
-
-// Save newspaper to Supabase
+// Save newspaper
 export const saveNewspaper = async (newspaper, pdfFile = null) => {
   try {
-    console.log('Saving newspaper to Supabase:', newspaper.name);
+    console.log('Saving newspaper to Firestore:', newspaper.name);
     
-    if (!newspaper || !newspaper.id) {
-      throw new Error('Invalid newspaper data - missing ID');
-    }
-    
-    let processedNewspaper = { ...newspaper };
-    
-    // Upload PDF if provided
+    // Convert PDF to base64 if provided
     if (pdfFile) {
-      try {
-        console.log('Uploading PDF file:', pdfFile.name);
-        const pdfURL = await uploadPDFToStorage(pdfFile, newspaper.id);
-        processedNewspaper.pdfUrl = pdfURL;
-        console.log('PDF uploaded successfully:', pdfURL);
-      } catch (error) {
-        console.error('PDF upload failed:', error);
-        // Continue without PDF URL - use data URL as fallback
-      }
+      const reader = new FileReader();
+      const pdfData = await new Promise((resolve) => {
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(pdfFile);
+      });
+      newspaper.pdfData = pdfData;
     }
     
-    // Process and upload images
-    if (newspaper.pages && newspaper.pages.length > 0) {
-      try {
-        console.log('Processing images for storage:', newspaper.pages.length, 'pages');
-        processedNewspaper.pages = await processImagesForStorage(newspaper.pages, newspaper.id);
-        console.log('Images processed successfully');
-      } catch (error) {
-        console.error('Image processing failed:', error);
-        // Keep original pages as fallback
-        processedNewspaper.pages = newspaper.pages;
-      }
-    }
+    // Save to Firestore
+    const docRef = doc(db, NEWSPAPERS_COLLECTION, newspaper.id);
+    await setDoc(docRef, {
+      ...newspaper,
+      updatedAt: new Date().toISOString()
+    });
     
-    // Keep PDF URL for access
-    if (processedNewspaper.pdfData && !processedNewspaper.pdfUrl) {
-      processedNewspaper.pdfUrl = processedNewspaper.pdfData;
-    }
-    
-    // Remove pdfData to save space
-    if (processedNewspaper.pdfData) {
-      delete processedNewspaper.pdfData;
-    }
-    
-    console.log('Saving processed newspaper to Supabase...');
-    const id = await saveNewspaperToSupabase(processedNewspaper);
-    console.log('Newspaper saved with ID:', id);
-    
-    return id;
+    console.log('Newspaper saved successfully');
+    return newspaper.id;
   } catch (error) {
-    console.error('Error saving to Supabase:', error);
-    throw new Error(`Failed to save newspaper: ${error.message}`);
+    console.error('Error saving newspaper:', error);
+    throw error;
   }
 };
 
-// Get newspapers from Supabase
+// Get all newspapers
 export const getNewspapers = async () => {
   try {
-    const newspapers = await getNewspapersFromSupabase();
-    console.log('Retrieved newspapers from Supabase:', newspapers.length);
-    return newspapers;
+    const q = query(collection(db, NEWSPAPERS_COLLECTION), orderBy('createdAt', 'desc'));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   } catch (error) {
-    console.error('Error getting newspapers from Supabase:', error);
+    console.error('Error getting newspapers:', error);
     return [];
   }
 };
 
-// Get newspaper by ID from Supabase
+// Get newspaper by ID
 export const getNewspaperById = async (id) => {
   try {
-    return await getNewspaperFromSupabase(id);
+    const docRef = doc(db, NEWSPAPERS_COLLECTION, id);
+    const docSnap = await getDoc(docRef);
+    return docSnap.exists() ? { id: docSnap.id, ...docSnap.data() } : null;
   } catch (error) {
-    console.error('Error getting newspaper by ID from Supabase:', error);
+    console.error('Error getting newspaper:', error);
     return null;
   }
 };
 
-// Delete newspaper from Supabase
+// Delete newspaper
 export const deleteNewspaper = async (id) => {
   try {
-    await deleteNewspaperFromSupabase(id);
+    // Delete from Firestore
+    await deleteDoc(doc(db, NEWSPAPERS_COLLECTION, id));
+    
+    // Clear from today's newspaper if it's the current one
+    const todaysNewspaper = await getTodaysNewspaper();
+    if (todaysNewspaper && todaysNewspaper.id === id) {
+      await setDoc(doc(db, SETTINGS_COLLECTION, TODAY_DOC), { newspaperId: null });
+    }
+    
     return true;
   } catch (error) {
-    console.error('Error deleting newspaper from Supabase:', error);
+    console.error('Error deleting newspaper:', error);
     return false;
   }
 };
 
-// Save clickable areas to Supabase
+// Save clickable areas
 export const saveClickableAreas = async (newspaperId, areas) => {
   try {
-    return await updateNewspaperAreas(newspaperId, areas);
+    const docRef = doc(db, NEWSPAPERS_COLLECTION, newspaperId);
+    await updateDoc(docRef, { 
+      areas: areas,
+      updatedAt: new Date().toISOString()
+    });
+    return true;
   } catch (error) {
-    console.error('Error saving areas to Supabase:', error);
+    console.error('Error saving areas:', error);
     return false;
   }
 };
 
-// Get today's newspaper from Supabase
-export const getTodaysNewspaper = async () => {
-  try {
-    return await getTodaysNewspaperFromSupabase();
-  } catch (error) {
-    console.error('Error getting today\'s newspaper from Supabase:', error);
-    return null;
-  }
-};
-
-// Set today's newspaper in Supabase
-export const setTodaysNewspaper = async (newspaper) => {
-  try {
-    if (typeof newspaper === 'object' && newspaper.id) {
-      return await setTodaysNewspaperInSupabase(newspaper.id);
-    } else {
-      return await setTodaysNewspaperInSupabase(newspaper);
-    }
-  } catch (error) {
-    console.error('Error setting today\'s newspaper in Supabase:', error);
-    return false;
-  }
-};
-
-// Get clickable areas (same as getNewspaperById since areas are stored with newspaper)
+// Get clickable areas
 export const getClickableAreas = async (newspaperId) => {
   try {
     const newspaper = await getNewspaperById(newspaperId);
     return newspaper?.areas || [];
   } catch (error) {
-    console.error('Error getting clickable areas:', error);
+    console.error('Error getting areas:', error);
     return [];
+  }
+};
+
+// Get today's newspaper
+export const getTodaysNewspaper = async () => {
+  try {
+    const docRef = doc(db, SETTINGS_COLLECTION, TODAY_DOC);
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists() && docSnap.data().newspaperId) {
+      return await getNewspaperById(docSnap.data().newspaperId);
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting today\'s newspaper:', error);
+    return null;
+  }
+};
+
+// Set today's newspaper
+export const setTodaysNewspaper = async (newspaper) => {
+  try {
+    const docRef = doc(db, SETTINGS_COLLECTION, TODAY_DOC);
+    await setDoc(docRef, { 
+      newspaperId: newspaper.id,
+      updatedAt: new Date().toISOString()
+    });
+    return true;
+  } catch (error) {
+    console.error('Error setting today\'s newspaper:', error);
+    return false;
   }
 };
 
 // Publish newspaper as today's edition
 export const publishToday = async (newspaperId) => {
   try {
-    console.log('Publishing newspaper as today\'s edition:', newspaperId);
-    
-    if (!newspaperId) {
-      throw new Error('No newspaper ID provided');
-    }
-    
-    // Verify newspaper exists first
     const newspaper = await getNewspaperById(newspaperId);
-    if (!newspaper) {
-      throw new Error('Newspaper not found');
+    if (newspaper) {
+      await setTodaysNewspaper(newspaper);
+      return true;
     }
-    
-    console.log('Found newspaper to publish:', newspaper.name);
-    const result = await setTodaysNewspaper(newspaperId);
-    
-    if (result) {
-      console.log('Successfully published newspaper as today\'s edition');
-    } else {
-      console.error('Failed to publish newspaper');
-    }
-    
-    return result;
+    return false;
   } catch (error) {
     console.error('Error publishing newspaper:', error);
     return false;
@@ -218,6 +165,6 @@ export const publishToday = async (newspaperId) => {
 export const getStorageStatus = () => {
   return {
     usingFirebase: true,
-    storageType: 'Supabase Cloud Storage'
+    storageType: 'Firestore Database Only'
   };
 };
